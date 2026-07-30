@@ -141,16 +141,11 @@ set(WITH_LLVM ON)
 set(WITH_PYTHON ON)
 set(WITH_PYTHON_INSTALL OFF)
 set(WITH_PYTHON_MODULE OFF)
-set(WITH_TRACY OFF)
 set(WITH_DOC_MANPAGE OFF)
-# Cycles: CPU + embree only; no desktop/vendor GPU backends on Android.
-set(WITH_CYCLES ON)
-set(WITH_CYCLES_DEVICE_CUDA OFF)
-set(WITH_CYCLES_DEVICE_OPTIX OFF)
-set(WITH_CYCLES_DEVICE_HIP OFF)
-set(WITH_CYCLES_DEVICE_ONEAPI OFF)
-set(WITH_CYCLES_CUDA_BINARIES OFF)
 set(WITH_CYCLES_HYDRA_RENDER_DELEGATE OFF)
+
+# Shared feature toggles (must match the host codegen-tools build exactly).
+include(${CMAKE_SOURCE_DIR}/build_files/android/android_features.cmake)
 
 # -----------------------------------------------------------------------------
 # Locate the harvested dependencies (mirrors platform_unix for our subset).
