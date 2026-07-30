@@ -336,6 +336,13 @@ Enable building Blender against SDL for windowing rather than the native APIs"
 )
 mark_as_advanced(WITH_GHOST_SDL)
 
+# Android windowing backend (NativeActivity + Vulkan). Auto-on when the NDK
+# toolchain sets ANDROID. See build_files/android/README.md.
+if(ANDROID)
+  option(WITH_GHOST_ANDROID "Enable building Blender against the Android native windowing APIs" ON)
+  mark_as_advanced(WITH_GHOST_ANDROID)
+endif()
+
 if(UNIX AND NOT (APPLE OR HAIKU))
   option(WITH_GHOST_X11 "Enable building Blender against X11 for windowing" ON)
   mark_as_advanced(WITH_GHOST_X11)
