@@ -1541,7 +1541,9 @@ endif()
 # - WIN32
 # - APPLE
 
-if(UNIX AND NOT APPLE)
+if(ANDROID)
+  include(platform_android)
+elseif(UNIX AND NOT APPLE)
   include(platform_unix)
 elseif(WIN32)
   include(platform_win32)
