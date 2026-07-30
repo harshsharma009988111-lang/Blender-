@@ -195,8 +195,8 @@ build_tiff() {
   fetch "tiff-$v.tar.gz" "https://download.osgeo.org/libtiff/tiff-$v.tar.gz"
   local src; src="$(extract "tiff-$v.tar.gz" tiff)"
   cmake_install "$src" tiff \
-    -DCMAKE_PREFIX_PATH="$LIBDIR/zlib;$LIBDIR/jpeg;$LIBDIR/zstd" \
-    -Dtiff-tools=OFF -Dtiff-tests=OFF -Dtiff-docs=OFF
+    -Dtiff-tools=OFF -Dtiff-tests=OFF -Dtiff-docs=OFF \
+    -Dwebp=OFF -Dlerc=OFF -Djbig=OFF
 }
 
 build_webp() {
