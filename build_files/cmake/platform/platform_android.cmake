@@ -188,6 +188,14 @@ if(WITH_PYTHON)
     message(FATAL_ERROR "No host python3 found for build-time scripts")
   endif()
   set(PYTHON_EXECUTABLE "${HOST_PYTHON_EXECUTABLE}" CACHE FILEPATH "" FORCE)
+
+  # numpy (cross-compiled into the target site-packages).
+  set(_np ${LIBDIR}/python/lib/python3.13/site-packages/numpy/_core/include)
+  if(EXISTS ${_np}/numpy/ndarrayobject.h)
+    set(WITH_PYTHON_NUMPY ON)
+    set(PYTHON_NUMPY_INCLUDE_DIRS ${_np})
+    set(PYTHON_NUMPY_PATH ${LIBDIR}/python/lib/python3.13/site-packages)
+  endif()
 endif()
 
 find_package_wrapper(OpenEXR REQUIRED)

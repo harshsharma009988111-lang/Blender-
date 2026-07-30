@@ -429,6 +429,8 @@ EOF
       --prefix="$LIBDIR/python" &&
     make -j"$(sysctl -n hw.ncpu)" && make install )
   unset CC CXX AR RANLIB READELF CONFIG_SITE CPPFLAGS LDFLAGS PKG_CONFIG_LIBDIR
+  # The cross-built .pc leaves $(BLDLIBRARY) unexpanded; resolve it.
+  sed -i '' 's/\$(BLDLIBRARY)/-lpython3.13/' "$LIBDIR/python/lib/pkgconfig/python-$mm.pc"
   echo "[deps] installed python -> $LIBDIR/python"
 }
 
@@ -721,6 +723,53 @@ build_vulkan_headers() {
   fetch "vulkan-headers-$v.tar.gz" "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/vulkan-sdk-$v.0.tar.gz"
   local src; src="$(extract "vulkan-headers-$v.tar.gz" vulkan-headers)"
   cmake_install "$src" vulkan
+}
+
+build_numpy() {
+  local v; v="$(dep_version NUMPY_VERSION)"
+  fetch "numpy-$v.tar.gz" "https://github.com/numpy/numpy/releases/download/v$v/numpy-$v.tar.gz"
+  local src; src="$(extract "numpy-$v.tar.gz" numpy)"
+
+  # A host python 3.13 with pip drives the cross-build.
+  local host_py=/opt/homebrew/bin/python3.13
+  local venv="$WORK_DIR/numpy-buildenv"
+  if [ ! -x "$venv/bin/python" ]; then
+    "$host_py" -m venv "$venv"
+    "$venv/bin/pip" install -q --upgrade pip cython meson-python ninja
+  fi
+
+  # Meson cross file for the NDK.
+  local cross="$WORK_DIR/numpy-cross.ini"
+  cat >"$cross" <<EOF
+[binaries]
+c = '$ANDROID_LLVM_BIN/aarch64-linux-android${ANDROID_API}-clang'
+cpp = '$ANDROID_LLVM_BIN/aarch64-linux-android${ANDROID_API}-clang++'
+ar = '$ANDROID_LLVM_BIN/llvm-ar'
+strip = '$ANDROID_LLVM_BIN/llvm-strip'
+pkg-config = '$(command -v pkg-config)'
+[host_machine]
+system = 'android'
+cpu_family = 'aarch64'
+cpu = 'aarch64'
+endian = 'little'
+[properties]
+needs_exe_wrapper = true
+longdouble_format = 'IEEE_QUAD_LE'
+EOF
+
+  # Make the host interpreter report the TARGET python's sysconfig, so the
+  # C extensions are built for Android (the iOS-branch technique).
+  export _PYTHON_SYSCONFIGDATA_NAME=_sysconfigdata__android_aarch64-linux-android
+  export PYTHONPATH="$LIBDIR/python/lib/python3.13"
+  export PATH="$venv/bin:$ANDROID_LLVM_BIN:$PATH"  # meson finds cython + compilers
+  export PKG_CONFIG_LIBDIR="$LIBDIR/python/lib/pkgconfig"  # target python .pc
+  "$venv/bin/python" -m pip install --no-build-isolation \
+    --target="$LIBDIR/python/lib/python3.13/site-packages" \
+    -Csetup-args=--cross-file="$cross" \
+    -Csetup-args=-Dallow-noblas=true \
+    "$src"
+  unset _PYTHON_SYSCONFIGDATA_NAME PYTHONPATH
+  echo "[deps] installed numpy -> $LIBDIR/python/lib/python3.13/site-packages"
 }
 
 build_materialx() {
