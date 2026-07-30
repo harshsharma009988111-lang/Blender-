@@ -11,9 +11,11 @@ libjpeg-turbo · brotli · freetype · harfbuzz · libwebp · libtiff · openjpe
 expat · yaml-cpp · c-blosc · pystring · minizip-ng · OpenColorIO ·
 OpenSubdiv (CPU) · robin-map · OpenImageIO · embree · Alembic · MaterialX ·
 potrace · sqlite · libffi · OpenSSL · **Python 3.13** · OpenVDB(+NanoVDB) ·
-ogg · vorbis · theora · opus · lame · aom · x265 · libvpx · x264 · **ffmpeg**
+ogg · vorbis · theora · opus · lame · aom · x265 · libvpx · x264 · **ffmpeg** ·
+**OpenUSD 26.03**
 
-In progress (background builds): LLVM (+clang, host tblgen then cross), USD.
+In progress (background build): LLVM (+clang, host tblgen done, cross building).
+After LLVM: OSL (needs LLVM), then wire Blender's main build to lib/android_arm64.
 
 Notes:
 - OpenColorIO: Python bindings off (Python not yet ported), SSE off (arm64);
