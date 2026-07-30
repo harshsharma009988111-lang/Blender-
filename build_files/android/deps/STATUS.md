@@ -9,7 +9,8 @@ Run: `build_files/android/deps/build.sh <dep>`. Installs into
 zlib · zstd · libdeflate · Imath · fmt · oneTBB · OpenEXR · libpng · pugixml ·
 libjpeg-turbo · brotli · freetype · harfbuzz · libwebp · libtiff · openjpeg ·
 expat · yaml-cpp · c-blosc · pystring · minizip-ng · OpenColorIO ·
-OpenSubdiv (CPU) · robin-map · OpenImageIO
+OpenSubdiv (CPU) · robin-map · OpenImageIO · embree · Alembic · MaterialX ·
+potrace · sqlite
 
 Notes:
 - OpenColorIO: Python bindings off (Python not yet ported), SSE off (arm64);
@@ -17,6 +18,8 @@ Notes:
 - OpenSubdiv: CPU only; gated OPENGLES_FOUND behind NO_OPENGL.
 - OpenImageIO: Python/libheif/openjph/libraw/ffmpeg/OpenVDB/Qt/OpenGL off for
   now; re-enable as those deps land. Ptex optional (not built).
+- embree: NEON ISA, TBB tasking, ISPC off. Alembic: HDF5 off. MaterialX:
+  core/codegen only (render off, needs X11). potrace/sqlite via autotools.
 
 ## Cross-compile lessons baked into build.sh
 
