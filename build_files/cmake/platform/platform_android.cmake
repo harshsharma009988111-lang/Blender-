@@ -18,6 +18,10 @@ if(NOT EXISTS "${LIBDIR}")
 endif()
 message(STATUS "Android LIBDIR = ${LIBDIR}")
 
+# NDK libc++ lacks std::atomic_ref (C++20); force-include a polyfill.
+string(APPEND CMAKE_CXX_FLAGS
+  " -include ${CMAKE_SOURCE_DIR}/build_files/android/compat/atomic_ref_compat.hpp")
+
 # The NDK ships older Vulkan headers; use our up-to-date Vulkan-Headers first.
 include_directories(BEFORE SYSTEM ${LIBDIR}/vulkan/include)
 set(VULKAN_INCLUDE_DIR ${LIBDIR}/vulkan/include)
