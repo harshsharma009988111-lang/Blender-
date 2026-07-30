@@ -38,6 +38,7 @@ GHOST_SystemAndroid::GHOST_SystemAndroid()
       meta_state_(0),
       cursor_x_(0),
       cursor_y_(0),
+      stylus_button_down_(false),
       gesture_active_(false),
       gesture_prev_x_(0.0f),
       gesture_prev_y_(0.0f),
@@ -246,32 +247,46 @@ int32_t GHOST_SystemAndroid::handleMotionEvent(AInputEvent *event)
 
   gesture_active_ = false;
 
-  const GHOST_TabletData tablet = tablet_from_event(event);
+  /* On proximity exit the stylus leaves range; report no tablet. */
+  const bool hover_exit = action == AMOTION_EVENT_ACTION_HOVER_EXIT;
+  const GHOST_TabletData tablet = hover_exit ? GHOST_TABLET_DATA_NONE :
+                                              tablet_from_event(event);
   const int32_t x = int32_t(AMotionEvent_getX(event, 0));
   const int32_t y = int32_t(AMotionEvent_getY(event, 0));
   meta_state_ = AMotionEvent_getMetaState(event);
   cursor_x_ = x;
   cursor_y_ = y;
 
-  /* Stylus barrel button maps to right mouse (S Pen side button). */
-  const bool secondary = (AMotionEvent_getButtonState(event) &
-                          AMOTION_EVENT_BUTTON_STYLUS_PRIMARY) != 0;
-  const GHOST_TButton button = secondary ? GHOST_kButtonMaskRight : GHOST_kButtonMaskLeft;
-
+  /* Cursor tracks the tip whether touching or hovering (S Pen proximity). */
   pushEvent(std::make_unique<GHOST_EventCursor>(
       getMilliSeconds(), GHOST_kEventCursorMove, window_, x, y, tablet));
 
+  /* S Pen side button: independent right-click, in hover or contact. */
+  const bool side = (AMotionEvent_getButtonState(event) &
+                     AMOTION_EVENT_BUTTON_STYLUS_PRIMARY) != 0;
+  if (side != stylus_button_down_) {
+    stylus_button_down_ = side;
+    buttons_.set(GHOST_kButtonMaskRight, side);
+    pushEvent(std::make_unique<GHOST_EventButton>(
+        getMilliSeconds(),
+        side ? GHOST_kEventButtonDown : GHOST_kEventButtonUp,
+        window_,
+        GHOST_kButtonMaskRight,
+        tablet));
+  }
+
+  /* Tip contact is the left button. */
   switch (action) {
     case AMOTION_EVENT_ACTION_DOWN:
-      buttons_.set(button, true);
+      buttons_.set(GHOST_kButtonMaskLeft, true);
       pushEvent(std::make_unique<GHOST_EventButton>(
-          getMilliSeconds(), GHOST_kEventButtonDown, window_, button, tablet));
+          getMilliSeconds(), GHOST_kEventButtonDown, window_, GHOST_kButtonMaskLeft, tablet));
       return 1;
     case AMOTION_EVENT_ACTION_UP:
     case AMOTION_EVENT_ACTION_CANCEL:
-      buttons_.set(button, false);
+      buttons_.set(GHOST_kButtonMaskLeft, false);
       pushEvent(std::make_unique<GHOST_EventButton>(
-          getMilliSeconds(), GHOST_kEventButtonUp, window_, button, tablet));
+          getMilliSeconds(), GHOST_kEventButtonUp, window_, GHOST_kButtonMaskLeft, tablet));
       return 1;
     default:
       return 1;

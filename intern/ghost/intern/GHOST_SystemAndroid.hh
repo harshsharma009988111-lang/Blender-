@@ -95,6 +95,9 @@ class GHOST_SystemAndroid : public GHOST_System {
   int32_t meta_state_;
   int32_t cursor_x_, cursor_y_;
 
+  /* S Pen side button, tracked so it works while hovering or touching. */
+  bool stylus_button_down_;
+
   /* Two-finger gesture tracking (pan/pinch), computed from raw pointers. */
   bool gesture_active_;
   float gesture_prev_x_, gesture_prev_y_, gesture_prev_dist_;
