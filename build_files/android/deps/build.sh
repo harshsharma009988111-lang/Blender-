@@ -789,6 +789,14 @@ build_shaderc() {
     -DBUILD_SHARED_LIBS=OFF -DSHADERC_ENABLE_SHARED_CRT=ON
 }
 
+build_meshoptimizer() {
+  local v; v="$(dep_version MESHOPTIMIZER_VERSION)"
+  fetch "meshoptimizer-$v.zip" "https://github.com/zeux/meshoptimizer/archive/refs/tags/v$v.zip"
+  local dir="$WORK_DIR/meshoptimizer"; rm -rf "$dir"; mkdir -p "$dir"
+  ( cd "$dir" && unzip -q "$DL_DIR/meshoptimizer-$v.zip" && mv meshoptimizer-*/* . )
+  cmake_install "$dir" meshoptimizer -DMESHOPT_BUILD_SHARED_LIBS=OFF
+}
+
 build_materialx() {
   local v; v="$(dep_version MATERIALX_VERSION)"
   fetch "materialx-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/MaterialX/archive/refs/tags/v$v.tar.gz"

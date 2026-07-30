@@ -227,6 +227,8 @@ find_package_wrapper(USD)
 find_package_wrapper(MaterialX)
 find_package_wrapper(OpenSubdiv)
 find_package_wrapper(Potrace)
+set(meshoptimizer_ROOT ${LIBDIR}/meshoptimizer)
+find_package_wrapper(meshoptimizer)
 
 if(WITH_VULKAN_BACKEND)
   set(SHADERC_ROOT_DIR ${LIBDIR}/shaderc)
