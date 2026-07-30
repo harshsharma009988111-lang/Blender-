@@ -176,9 +176,11 @@ elseif(WITH_GHOST_ANDROID)
   list(APPEND SRC
     intern/GHOST_AndroidMain.cc
     intern/GHOST_SystemAndroid.cc
+    intern/GHOST_SystemPathsAndroid.cc
     intern/GHOST_WindowAndroid.cc
 
     intern/GHOST_SystemAndroid.hh
+    intern/GHOST_SystemPathsAndroid.hh
     intern/GHOST_WindowAndroid.hh
   )
   add_definitions(-DWITH_GHOST_ANDROID)

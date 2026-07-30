@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "GHOST_Buttons.hh"
 #include "GHOST_System.hh"
 
 struct android_app;
@@ -22,6 +23,7 @@ class GHOST_SystemAndroid : public GHOST_System {
 
   /* Set by the NativeActivity glue before GHOST is created. */
   static void setAndroidApp(android_app *app);
+  static android_app *getAndroidApp();
 
   bool processEvents(bool waitForEvent) override;
 
@@ -83,6 +85,11 @@ class GHOST_SystemAndroid : public GHOST_System {
   android_app *app_;
   GHOST_WindowAndroid *window_;
   uint64_t start_time_;
+
+  /* Input state tracked from events for the out-of-queue queries. */
+  GHOST_Buttons buttons_;
+  int32_t meta_state_;
+  int32_t cursor_x_, cursor_y_;
 
   /* Two-finger gesture tracking (pan/pinch), computed from raw pointers. */
   bool gesture_active_;

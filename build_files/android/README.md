@@ -58,6 +58,10 @@ This proves CMake → NDK → Ninja works before any dependency work.
    at text-edit begin/end via base GHOST `popupOnScreenKeyboard`/`hideOnScreenKeyboard`
    hooks (no-op on desktop). Note: NativeActivity does not deliver typed soft-keyboard
    text back — hardware keys work; on-screen typing needs JNI/GameTextInput later.
+5b. ✅ Backend stubs implemented: DPI from `AConfiguration`, modifier/button/cursor
+   state from events, headless Vulkan offscreen context, `GHOST_SystemPathsAndroid`,
+   clipboard via JNI `ClipboardManager`, surface-resize event on recreate.
+   App is landscape-only. Remaining deferral: soft-keyboard text delivery.
 6. ⬜ Port third-party dependencies for `android-arm64` (Python, LLVM, OIIO, TBB,
    USD, embree, OCIO, ffmpeg …). Largest remaining effort.
 7. ⬜ APK/AAB packaging (NativeActivity manifest) + `adb install` to the tablet.
