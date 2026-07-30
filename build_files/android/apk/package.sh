@@ -67,6 +67,18 @@ for so in "$JNI"/*.so; do
 done
 echo "[apk] bundled $(ls "$JNI" | wc -l | tr -d ' ') native libraries ($(du -sh "$JNI" | cut -f1))"
 
+echo "[apk] assembling runtime payload (python + scripts + datafiles)"
+ASSETS="$STAGE/assets"
+PAYLOAD="$STAGE/payload"
+mkdir -p "$ASSETS" "$PAYLOAD/python/lib"
+cp -R "$REPO_ROOT/release/datafiles" "$PAYLOAD/datafiles"
+cp -R "$REPO_ROOT/scripts" "$PAYLOAD/scripts"
+cp -R "$LIBDIR/python/lib/python3.13" "$PAYLOAD/python/lib/python3.13"
+# Trim caches to keep the payload smaller.
+find "$PAYLOAD" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
+( cd "$PAYLOAD" && zip -qr -X "$ASSETS/blender_runtime.zip" . )
+echo "[apk] runtime payload: $(du -sh "$ASSETS/blender_runtime.zip" | cut -f1)"
+
 echo "[apk] compiling BlenderActivity"
 mkdir -p "$STAGE/javac" "$STAGE/dex"
 "$JAVA_HOME/bin/javac" -classpath "$ANDROID_JAR" -source 17 -target 17 \
@@ -78,7 +90,7 @@ mkdir -p "$STAGE/javac" "$STAGE/dex"
 echo "[apk] linking resources"
 "$BT/aapt2" link -o "$STAGE/base.apk" -I "$ANDROID_JAR" \
   --manifest "$SCRIPT_DIR/app/src/main/AndroidManifest.xml" \
-  -A "$SCRIPT_DIR/app/src/main/assets" \
+  -A "$ASSETS" -0 zip \
   --min-sdk-version "$ANDROID_API" --target-sdk-version "$ANDROID_TARGET_API"
 
 echo "[apk] assembling"

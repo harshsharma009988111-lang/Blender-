@@ -7,6 +7,7 @@ package org.blender.blender;
 import android.app.NativeActivity;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
+import android.content.res.AssetManager;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.KeyEvent;
@@ -17,12 +18,23 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+
 /**
- * NativeActivity subclass that bridges soft-keyboard (IME) text into GHOST.
- * NativeActivity's surface has no InputConnection, so a tiny focusable proxy
- * view owns one and forwards committed text/keys to native via JNI.
+ * NativeActivity subclass for Blender. Extracts the bundled runtime
+ * (Python + scripts + datafiles) on first launch, then loads libblender.so
+ * and bridges soft-keyboard IME text to native. Landscape only.
  */
 public class BlenderActivity extends NativeActivity {
+
+  /* Must match GHOST_SystemPathsAndroid: <filesDir>/blender/<version>. */
+  private static final String VERSION = "5.3";
+  private static final String RUNTIME_ZIP = "blender_runtime.zip";
 
   private InputView inputView;
 
@@ -31,11 +43,48 @@ public class BlenderActivity extends NativeActivity {
 
   @Override
   protected void onCreate(Bundle state) {
+    /* Runtime files must exist before native Blender init reads them. */
+    extractRuntimeIfNeeded();
     super.onCreate(state);
     setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
 
     inputView = new InputView(this);
     addContentView(inputView, new ViewGroup.LayoutParams(1, 1));
+  }
+
+  private void extractRuntimeIfNeeded() {
+    File root = new File(getFilesDir(), "blender/" + VERSION);
+    File marker = new File(root, ".installed-" + VERSION);
+    if (marker.exists()) {
+      return;
+    }
+    root.mkdirs();
+    try (InputStream is = getAssets().open(RUNTIME_ZIP, AssetManager.ACCESS_STREAMING);
+         ZipInputStream zis = new ZipInputStream(is)) {
+      ZipEntry e;
+      byte[] buf = new byte[65536];
+      while ((e = zis.getNextEntry()) != null) {
+        File out = new File(root, e.getName());
+        if (e.isDirectory()) {
+          out.mkdirs();
+          continue;
+        }
+        File parent = out.getParentFile();
+        if (parent != null) {
+          parent.mkdirs();
+        }
+        try (OutputStream os = new FileOutputStream(out)) {
+          int n;
+          while ((n = zis.read(buf)) > 0) {
+            os.write(buf, 0, n);
+          }
+        }
+      }
+      marker.createNewFile();
+    }
+    catch (Exception ex) {
+      throw new RuntimeException("Failed to extract Blender runtime", ex);
+    }
   }
 
   /* Called from native (popupOnScreenKeyboard). */
