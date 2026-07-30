@@ -62,6 +62,21 @@ find_roots() {
   echo "$roots"
 }
 
+# Some projects hard-link -lpthread/-lrt, which Android folds into libc.
+# Create empty stub archives so those -l flags resolve. Echoes the dir.
+stub_libs() {
+  local dir="$LIBDIR/.stublibs"
+  if [ ! -f "$dir/libpthread.a" ]; then
+    mkdir -p "$dir"
+    echo "" > "$WORK_DIR/empty.c"
+    "$ANDROID_LLVM_BIN/aarch64-linux-android${ANDROID_API}-clang" -c "$WORK_DIR/empty.c" \
+      -o "$WORK_DIR/empty.o"
+    "$ANDROID_LLVM_BIN/llvm-ar" rcs "$dir/libpthread.a" "$WORK_DIR/empty.o"
+    "$ANDROID_LLVM_BIN/llvm-ar" rcs "$dir/librt.a" "$WORK_DIR/empty.o"
+  fi
+  echo "$dir"
+}
+
 # Configure/build/install a CMake-based dependency for Android.
 # $1 src dir, $2 install name, rest: extra cmake args.
 cmake_install() {
@@ -467,6 +482,29 @@ build_lame() {
   # lame's symbol map lists lame_init_old which isn't built; allow it.
   EXTRA_LDFLAGS="-Wl,--undefined-version" \
     autotools_install "$src" lame --disable-static --enable-shared --disable-frontend
+}
+
+build_x265() {
+  local v; v="$(dep_version X265_VERSION)"
+  fetch "x265_$v.tar.gz" "https://bitbucket.org/multicoreware/x265_git/downloads/x265_$v.tar.gz"
+  local src; src="$(extract "x265_$v.tar.gz" x265)"
+  # CMake 4 dropped OLD for CMP0025/CMP0054; x265 forces them.
+  sed -i '' -E 's/cmake_policy\(SET (CMP0025|CMP0054) OLD\)/cmake_policy(SET \1 NEW)/' \
+    "$src/source/CMakeLists.txt"
+  # ENABLE_ASSEMBLY off: x265's arm path passes -mcpu=armv8-a which clang
+  # rejects as a CPU name. Functional without asm (slower HEVC encode).
+  local stub; stub="$(stub_libs)"
+  cmake_install "$src/source" x265 -DENABLE_SHARED=ON -DENABLE_CLI=OFF -DENABLE_ASSEMBLY=OFF \
+    -DCMAKE_SHARED_LINKER_FLAGS="-L$stub" -DCMAKE_EXE_LINKER_FLAGS="-L$stub"
+}
+
+build_aom() {
+  local v; v="$(dep_version AOM_VERSION)"
+  fetch "libaom-$v.tar.gz" "https://storage.googleapis.com/aom-releases/libaom-$v.tar.gz"
+  local src; src="$(extract "libaom-$v.tar.gz" aom)"
+  cmake_install "$src" aom \
+    -DBUILD_SHARED_LIBS=ON -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF \
+    -DENABLE_TOOLS=OFF -DENABLE_DOCS=OFF
 }
 
 build_materialx() {
