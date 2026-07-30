@@ -142,7 +142,8 @@ build_pugixml() {
   local v; v="$(dep_version PUGIXML_VERSION)"
   fetch "pugixml-$v.tar.gz" "https://github.com/zeux/pugixml/archive/v$v.tar.gz"
   local src; src="$(extract "pugixml-$v.tar.gz" pugixml)"
-  cmake_install "$src" pugixml -DBUILD_SHARED_LIBS=OFF
+  # pugixml 1.10 predates CMake 4's minimum-policy floor.
+  cmake_install "$src" pugixml -DBUILD_SHARED_LIBS=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 }
 
 build_openexr() {
