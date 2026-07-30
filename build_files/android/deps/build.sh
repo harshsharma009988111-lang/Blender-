@@ -299,6 +299,27 @@ build_opensubdiv() {
     -DNO_OPENGL=ON -DNO_TBB=OFF -DNO_PTEX=ON -DNO_GLTESTS=ON -DNO_GLEW=ON -DNO_GLFW=ON
 }
 
+build_robinmap() {
+  local v; v="$(dep_version ROBINMAP_VERSION)"
+  fetch "robinmap-$v.tar.gz" "https://github.com/Tessil/robin-map/archive/refs/tags/$v.tar.gz"
+  local src; src="$(extract "robinmap-$v.tar.gz" robinmap)"
+  cmake_install "$src" robinmap
+}
+
+build_openimageio() {
+  local v; v="$(dep_version OPENIMAGEIO_VERSION)"  # v3.1.13.1
+  fetch "oiio-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/OpenImageIO/archive/refs/tags/$v.tar.gz"
+  local src; src="$(extract "oiio-$v.tar.gz" openimageio)"
+  cmake_install "$src" openimageio \
+    -DBUILD_SHARED_LIBS=ON \
+    -DOIIO_BUILD_TESTS=OFF -DOIIO_BUILD_TOOLS=OFF \
+    -DUSE_PYTHON=OFF -DUSE_LIBRAW=OFF -DUSE_QT=OFF -DUSE_OPENGL=OFF \
+    -DUSE_FFMPEG=OFF -DUSE_LIBHEIF=OFF -DUSE_OPENJPH=OFF -DUSE_OPENVDB=OFF \
+    -DUSE_DCMTK=OFF -DUSE_NUKE=OFF -DUSE_TBB=ON \
+    -DFMT_INCLUDE_DIR="$LIBDIR/fmt/include" -Dfmt_ROOT="$LIBDIR/fmt" \
+    -DRobinmap_ROOT="$LIBDIR/robinmap"
+}
+
 build_openexr() {
   local v; v="$(dep_version OPENEXR_VERSION)"
   fetch "openexr-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/openexr/archive/v$v.tar.gz"
