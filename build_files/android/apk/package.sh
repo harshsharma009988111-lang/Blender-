@@ -33,33 +33,39 @@ readelf_needed() {
   "$ANDROID_LLVM_BIN/llvm-readelf" -d "$1" 2>/dev/null |
     sed -nE 's/.*\(NEEDED\).*\[(.*)\]/\1/p'
 }
-declare -A seen
-queue=("$JNI/libblender.so" "$JNI/libc++_shared.so")
+# Iteratively resolve until no new libs appear (dedup = "already in $JNI").
 searchdirs=$(ls -d "$LIBDIR"/*/lib 2>/dev/null)
-while [ ${#queue[@]} -gt 0 ]; do
-  cur="${queue[0]}"; queue=("${queue[@]:1}")
-  for need in $(readelf_needed "$cur"); do
-    case "$need" in
-      lib*.so)
-        [ -n "${seen[$need]:-}" ] && continue
-        # System libs provided by Android; skip.
-        case "$need" in
-          libc.so|libm.so|libdl.so|liblog.so|libandroid.so|libGLESv*.so|\
-          libEGL.so|libvulkan.so|libOpenSLES.so|libjnigraphics.so|libz.so) continue;;
-        esac
-        for d in $searchdirs; do
-          if [ -f "$d/$need" ]; then
-            seen[$need]=1
-            cp "$d/$need" "$JNI/"
-            queue+=("$JNI/$need")
-            break
-          fi
-        done
-        ;;
-    esac
+changed=1
+while [ "$changed" = 1 ]; do
+  changed=0
+  for cur in "$JNI"/*.so; do
+    for need in $(readelf_needed "$cur"); do
+      case "$need" in
+        lib*.so) ;;
+        *) continue;;
+      esac
+      [ -f "$JNI/$need" ] && continue
+      # System libs provided by Android; skip.
+      case "$need" in
+        libc.so|libm.so|libdl.so|liblog.so|libandroid.so|libGLESv1_CM.so|\
+        libGLESv2.so|libGLESv3.so|libEGL.so|libvulkan.so|libOpenSLES.so|\
+        libjnigraphics.so|libz.so) continue;;
+      esac
+      for d in $searchdirs; do
+        if [ -f "$d/$need" ]; then
+          cp "$d/$need" "$JNI/"
+          changed=1
+          break
+        fi
+      done
+    done
   done
 done
-echo "[apk] bundled $(ls "$JNI" | wc -l | tr -d ' ') native libraries"
+echo "[apk] stripping native libraries"
+for so in "$JNI"/*.so; do
+  "$ANDROID_LLVM_BIN/llvm-strip" --strip-unneeded "$so" 2>/dev/null || true
+done
+echo "[apk] bundled $(ls "$JNI" | wc -l | tr -d ' ') native libraries ($(du -sh "$JNI" | cut -f1))"
 
 echo "[apk] compiling BlenderActivity"
 mkdir -p "$STAGE/javac" "$STAGE/dex"
