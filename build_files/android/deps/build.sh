@@ -250,6 +250,39 @@ build_blosc() {
     -DPREFER_EXTERNAL_ZLIB=ON -DPREFER_EXTERNAL_ZSTD=ON
 }
 
+build_pystring() {
+  local v; v="$(dep_version PYSTRING_VERSION)"  # v1.1.3
+  fetch "pystring-$v.tar.gz" "https://github.com/imageworks/pystring/archive/refs/tags/$v.tar.gz"
+  local src; src="$(extract "pystring-$v.tar.gz" pystring)"
+  # pystring ships no build system; reuse Blender's supplied CMakeLists.
+  cp "$REPO_ROOT/build_files/build_environment/patches/cmakelists_pystring.txt" \
+    "$src/CMakeLists.txt"
+  cmake_install "$src" pystring
+}
+
+build_minizipng() {
+  local v; v="$(dep_version MINIZIPNG_VERSION)"
+  fetch "minizip-ng-$v.tar.gz" "https://github.com/zlib-ng/minizip-ng/archive/$v.tar.gz"
+  local src; src="$(extract "minizip-ng-$v.tar.gz" minizipng)"
+  cmake_install "$src" minizipng \
+    -DMZ_FETCH_LIBS=OFF -DMZ_LIBCOMP=OFF -DMZ_PKCRYPT=OFF -DMZ_WZAES=OFF \
+    -DMZ_OPENSSL=OFF -DMZ_SIGNING=OFF -DMZ_LZMA=OFF -DMZ_ZSTD=OFF \
+    -DMZ_BZIP2=OFF -DMZ_ICONV=OFF
+}
+
+build_opencolorio() {
+  local v; v="$(dep_version OPENCOLORIO_VERSION)"
+  fetch "opencolorio-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/OpenColorIO/archive/v$v.tar.gz"
+  local src; src="$(extract "opencolorio-$v.tar.gz" opencolorio)"
+  # Python bindings off until Python is cross-compiled; use our harvested deps.
+  cmake_install "$src" opencolorio \
+    -DOCIO_INSTALL_EXT_PACKAGES=NONE \
+    -DOCIO_BUILD_APPS=OFF -DOCIO_BUILD_PYTHON=OFF -DOCIO_BUILD_NUKE=OFF \
+    -DOCIO_BUILD_JAVA=OFF -DOCIO_BUILD_DOCS=OFF -DOCIO_BUILD_TESTS=OFF \
+    -DOCIO_BUILD_GPU_TESTS=OFF -DOCIO_USE_SSE=OFF \
+    -Dminizip-ng_ROOT="$LIBDIR/minizipng" -Dpystring_ROOT="$LIBDIR/pystring"
+}
+
 build_openexr() {
   local v; v="$(dep_version OPENEXR_VERSION)"
   fetch "openexr-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/openexr/archive/v$v.tar.gz"
