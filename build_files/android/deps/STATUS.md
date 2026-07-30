@@ -51,7 +51,24 @@ unavailable; Blender already falls back to CPU subdiv
 (BKE_subsurf_modifier_can_do_gpu_subdiv → GPU_BACKEND_NONE path). Touches
 intern/opensubdiv (CMake + capi) and must stay desktop-safe.
 
-Then: link libblender.so, then OSL (host clang for bitcode), then APK.
+8. ✅ opensubdiv GPU-eval GL includes guarded (iOS approach) — GPU subdiv
+   still works via the backend-agnostic GPU module (Vulkan).
+9. ✅ USD `-DARCH_HAS_GNU_STL_EXTENSIONS` (Blender io/usd Linux/GCC ABI
+   workaround) excluded on Android (libc++).
+
+### CURRENT BLOCKER — numpy (as predicted)
+audaspace's Python `aud` module (extern/audaspace/bindings/python/
+PyAnimateableProperty.cpp) includes <numpy/ndarrayobject.h> unconditionally,
+so building Blender's Python needs numpy 2.3.4 cross-compiled for Android.
+This is a substantial focused task (meson cross-build + Cython + target-python
+C extensions, like the Python/LLVM builds). Host python 3.13 exists at
+android_deps_build/work/python-host-install (needs pip+cython+meson-python).
+Install into $LIBDIR/python/lib/python3.13/site-packages and set
+PYTHON_NUMPY_INCLUDE_DIRS / NUMPY_FOUND in platform_android.cmake.
+
+Everything else compiles: DNA/RNA gen, USD, Cycles (NEON), OpenSubdiv,
+OpenImageIO, Vulkan, MaterialX, etc. numpy is the last compile blocker before
+linking libblender.so, then APK.
 
 Old notes:
 Next: OSL (needs a host clang matching LLVM to generate bitcode — thorny).
