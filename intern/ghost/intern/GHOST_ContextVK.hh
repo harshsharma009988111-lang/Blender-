@@ -19,6 +19,8 @@
 #elif defined(__APPLE__)
 #  include "GHOST_SystemCocoa.hh"
 #  include <vulkan/vulkan_metal.h>
+#elif defined(__ANDROID__)
+struct ANativeWindow;
 #else
 #  ifdef WITH_GHOST_X11
 #    include "GHOST_SystemX11.hh"
@@ -115,6 +117,8 @@ class GHOST_ContextVK : public GHOST_Context {
 #elif defined(__APPLE__)
                   /* FIXME CAMetalLayer but have issue with linking. */
                   void *metal_layer,
+#elif defined(__ANDROID__)
+                  ANativeWindow *native_window,
 #else
                   GHOST_TVulkanPlatformType platform,
                   /* X11 */
@@ -246,6 +250,8 @@ class GHOST_ContextVK : public GHOST_Context {
 #elif defined(__APPLE__)
   /* Is CAMetalLayer* */
   void *metal_layer_;
+#elif defined(__ANDROID__)
+  ANativeWindow *native_window_;
 #else /* Linux */
   GHOST_TVulkanPlatformType platform_;
   /* X11 */

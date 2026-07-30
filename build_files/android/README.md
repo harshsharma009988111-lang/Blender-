@@ -45,13 +45,13 @@ This proves CMake → NDK → Ninja works before any dependency work.
 ## Roadmap
 
 1. ✅ NDK toolchain installed + CMake cross-compile verified.
-2. ⬜ Add `GHOST_kVulkanPlatformAndroid` surface case to `GHOST_ContextVK`
-   (`VK_KHR_android_surface`, `ANativeWindow*`).
-3. ⬜ Scaffold `GHOST_SystemAndroid` / `GHOST_WindowAndroid` + the `ANDROID`
+2. ✅ Android surface case in `GHOST_ContextVK` (`VK_KHR_android_surface`,
+   `ANativeWindow*`).
+3. ✅ Scaffold `GHOST_SystemAndroid` / `GHOST_WindowAndroid` + the `ANDROID`
    branch in `intern/ghost/CMakeLists.txt` (gated by `WITH_GHOST_ANDROID`).
 4. ⬜ Invert the main loop: Choreographer vsync → `WM_main_loop_body(C)`.
-5. ⬜ Input: `AMotionEvent`/gestures → GHOST trackpad/button/cursor events;
-   S Pen button → `GHOST_kButtonMaskRight`.
+5. 🚧 Input: `AMotionEvent`/gestures → GHOST events (basic down/up/move +
+   S Pen button → `GHOST_kButtonMaskRight` done; gestures/keyboard pending).
 6. ⬜ Port third-party dependencies for `android-arm64` (Python, LLVM, OIIO, TBB,
    USD, embree, OCIO, ffmpeg …). Largest remaining effort.
 7. ⬜ APK/AAB packaging (NativeActivity manifest) + `adb install` to the tablet.
