@@ -8,7 +8,10 @@ Run: `build_files/android/deps/build.sh <dep>`. Installs into
 
 zlib · zstd · libdeflate · Imath · fmt · oneTBB · OpenEXR · libpng · pugixml ·
 libjpeg-turbo · brotli · freetype · harfbuzz · libwebp · libtiff · openjpeg ·
-expat · yaml-cpp · c-blosc
+expat · yaml-cpp · c-blosc · pystring · minizip-ng · OpenColorIO
+
+OpenColorIO note: built with Python bindings off (Python not yet ported) and
+SSE off (arm64); re-enable OCIO_BUILD_PYTHON once Python lands.
 
 ## Cross-compile lessons baked into build.sh
 
