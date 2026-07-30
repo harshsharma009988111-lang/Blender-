@@ -77,11 +77,32 @@ build_zlib() {
   cmake_install "$src" zlib -DZLIB_BUILD_EXAMPLES=OFF
 }
 
+build_zstd() {
+  local v; v="$(dep_version ZSTD_VERSION)"
+  fetch "zstd-$v.tar.gz" "https://github.com/facebook/zstd/releases/download/v$v/zstd-$v.tar.gz"
+  local src; src="$(extract "zstd-$v.tar.gz" zstd)"
+  # zstd keeps its CMake project in build/cmake.
+  cmake_install "$src/build/cmake" zstd \
+    -DZSTD_BUILD_PROGRAMS=OFF \
+    -DZSTD_BUILD_SHARED=ON \
+    -DZSTD_BUILD_STATIC=ON
+}
+
+build_deflate() {
+  local v; v="$(dep_version DEFLATE_VERSION)"
+  fetch "libdeflate-$v.tar.gz" "https://github.com/ebiggers/libdeflate/archive/refs/tags/v$v.tar.gz"
+  local src; src="$(extract "libdeflate-$v.tar.gz" deflate)"
+  cmake_install "$src" deflate \
+    -DLIBDEFLATE_BUILD_SHARED_LIB=ON \
+    -DLIBDEFLATE_BUILD_STATIC_LIB=ON \
+    -DLIBDEFLATE_BUILD_GZIP=OFF
+}
+
 main() {
   [ $# -gt 0 ] || { echo "usage: $0 <dep> [dep...] | all" >&2; exit 1; }
   local targets=("$@")
   if [ "${1:-}" = all ]; then
-    targets=(zlib)
+    targets=(zlib zstd deflate)
   fi
   for t in "${targets[@]}"; do
     echo "=== building: $t ==="
