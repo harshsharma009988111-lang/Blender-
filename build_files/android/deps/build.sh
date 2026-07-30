@@ -619,6 +619,62 @@ build_usd() {
     -DCMAKE_CXX_FLAGS="-DNOFILE=1024 -D__environ=environ"
 }
 
+build_eigen() {
+  local v; v="$(dep_version EIGEN_VERSION)"
+  fetch "eigen-$v.tar.gz" "https://gitlab.com/libeigen/eigen/-/archive/$v/eigen-$v.tar.gz"
+  local src; src="$(extract "eigen-$v.tar.gz" eigen)"
+  cmake_install "$src" eigen -DEIGEN_BUILD_DOC=OFF -DBUILD_TESTING=OFF
+}
+
+build_sse2neon() {
+  local v; v="$(dep_version SSE2NEON_VERSION)"
+  fetch "sse2neon-$v.tar.gz" "https://github.com/DLTcollab/sse2neon/archive/$v.tar.gz"
+  local src; src="$(extract "sse2neon-$v.tar.gz" sse2neon)"
+  # Header-only: just install the header.
+  mkdir -p "$LIBDIR/sse2neon/include"
+  cp "$src/sse2neon.h" "$LIBDIR/sse2neon/include/"
+  echo "[deps] installed sse2neon -> $LIBDIR/sse2neon"
+}
+
+build_fribidi() {
+  local v; v="$(dep_version FRIBIDI_VERSION)"
+  fetch "fribidi-$v.tar.gz" "https://github.com/fribidi/fribidi/archive/refs/tags/$v.tar.gz"
+  local src; src="$(extract "fribidi-$v.tar.gz" fribidi)"
+  # fribidi uses meson; build with a cross file.
+  local cross="$WORK_DIR/fribidi-cross.ini"
+  cat >"$cross" <<EOF
+[binaries]
+c = '$ANDROID_LLVM_BIN/aarch64-linux-android${ANDROID_API}-clang'
+ar = '$ANDROID_LLVM_BIN/llvm-ar'
+strip = '$ANDROID_LLVM_BIN/llvm-strip'
+[host_machine]
+system = 'android'
+cpu_family = 'aarch64'
+cpu = 'aarch64'
+endian = 'little'
+EOF
+  ( cd "$src" && meson setup build-android --cross-file "$cross" \
+      --prefix="$LIBDIR/fribidi" -Ddocs=false -Dtests=false -Dbin=false --default-library=shared &&
+    ninja -C build-android && ninja -C build-android install )
+  echo "[deps] installed fribidi -> $LIBDIR/fribidi"
+}
+
+build_abseil() {
+  local v; v="$(dep_version ABSEIL_VERSION)"
+  fetch "abseil-cpp-$v.tar.gz" "https://github.com/abseil/abseil-cpp/releases/download/$v/abseil-cpp-$v.tar.gz"
+  local src; src="$(extract "abseil-cpp-$v.tar.gz" abseil)"
+  cmake_install "$src" abseil -DBUILD_SHARED_LIBS=ON -DABSL_PROPAGATE_CXX_STD=ON
+}
+
+build_spirv_reflect() {
+  local v; v="$(dep_version VULKAN_VERSION)"
+  fetch "spirv-reflect-$v.tar.gz" "https://github.com/KhronosGroup/SPIRV-Reflect/archive/refs/tags/vulkan-sdk-$v.tar.gz"
+  local src; src="$(extract "spirv-reflect-$v.tar.gz" spirv-reflect)"
+  cmake_install "$src" spirv_reflect \
+    -DSPIRV_REFLECT_EXECUTABLE=OFF -DSPIRV_REFLECT_EXAMPLES=OFF \
+    -DSPIRV_REFLECT_STATIC_LIB=ON
+}
+
 build_materialx() {
   local v; v="$(dep_version MATERIALX_VERSION)"
   fetch "materialx-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/MaterialX/archive/refs/tags/v$v.tar.gz"
