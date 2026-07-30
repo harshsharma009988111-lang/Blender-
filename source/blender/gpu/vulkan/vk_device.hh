@@ -49,6 +49,14 @@ struct VKExtensions {
   bool wide_lines = false;
 
   /**
+   * Does the device support VK_KHR_dynamic_rendering (core in Vulkan 1.3).
+   *
+   * When false (e.g. Vulkan 1.1 mobile GPUs like Adreno 642L) the backend falls
+   * back to classic VkRenderPass/VkFramebuffer instead of vkCmdBeginRendering.
+   */
+  bool dynamic_rendering = false;
+
+  /**
    * Does the device support VK_KHR_dynamic_rendering_local_read enabled.
    */
   bool dynamic_rendering_local_read = false;
@@ -70,6 +78,12 @@ struct VKExtensions {
    * Does the device support logic ops.
    */
   bool logic_ops = false;
+
+  /**
+   * Does the device support VK_EXT_provoking_vertex (last-vertex convention).
+   * When false the default first-vertex convention is used for flat shading.
+   */
+  bool provoking_vertex = false;
 
   /**
    * Does the device support VK_EXT_memory_priority

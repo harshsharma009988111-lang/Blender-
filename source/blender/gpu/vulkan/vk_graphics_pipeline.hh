@@ -394,8 +394,12 @@ struct VKGraphicsPipelineCreateInfoBuilder {
         VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     vk_pipeline_rasterization_state_create_info.lineWidth = 1.0f;
     vk_pipeline_rasterization_state_create_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    vk_pipeline_rasterization_state_create_info.pNext =
-        &vk_pipeline_rasterization_provoking_vertex_state_info;
+    /* Only chain the provoking-vertex state when the extension is available;
+     * otherwise the default first-vertex convention is used. */
+    if (extensions.provoking_vertex) {
+      vk_pipeline_rasterization_state_create_info.pNext =
+          &vk_pipeline_rasterization_provoking_vertex_state_info;
+    }
 
     vk_pipeline_rasterization_state_create_info.cullMode = to_vk_cull_mode_flags(
         static_cast<GPUFaceCullTest>(shaders_info.state.culling_test));

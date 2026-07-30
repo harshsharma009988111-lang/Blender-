@@ -42,6 +42,8 @@ void VKExtensions::log() const
              " - [%c] fragment shader barycentric\n"
              " - [%c] wide lines\n"
              "Device extensions\n"
+             " - [%c] dynamic rendering\n"
+             " - [%c] provoking vertex\n"
              " - [%c] dynamic rendering local read\n"
              " - [%c] dynamic rendering unused attachments\n"
              " - [%c] extended dynamic state\n"
@@ -59,6 +61,8 @@ void VKExtensions::log() const
              shader_output_layer ? 'X' : ' ',
              fragment_shader_barycentric ? 'X' : ' ',
              wide_lines ? 'X' : ' ',
+             dynamic_rendering ? 'X' : ' ',
+             provoking_vertex ? 'X' : ' ',
              dynamic_rendering_local_read ? 'X' : ' ',
              dynamic_rendering_unused_attachments ? 'X' : ' ',
              extended_dynamic_state ? 'X' : ' ',

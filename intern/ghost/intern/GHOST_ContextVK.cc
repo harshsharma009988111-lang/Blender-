@@ -642,19 +642,24 @@ struct GHOST_InstanceVK {
     feature_struct_ptr.push_back(&vulkan_12_features);
 
 #ifndef __APPLE__
-    /* Enable provoking vertex. */
+    /* Enable provoking vertex (optional; absent on some mobile GPUs). */
     VkPhysicalDeviceProvokingVertexFeaturesEXT provoking_vertex_features = {};
     provoking_vertex_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROVOKING_VERTEX_FEATURES_EXT;
     provoking_vertex_features.provokingVertexLast = VK_TRUE;
-    feature_struct_ptr.push_back(&provoking_vertex_features);
+    if (device.extensions.is_enabled(VK_EXT_PROVOKING_VERTEX_EXTENSION_NAME)) {
+      feature_struct_ptr.push_back(&provoking_vertex_features);
+    }
 #endif
 
-    /* Enable dynamic rendering. */
+    /* Enable dynamic rendering when available; Vulkan 1.1 GPUs fall back to
+     * classic render passes in the Vulkan backend. */
     VkPhysicalDeviceDynamicRenderingFeatures dynamic_rendering = {};
     dynamic_rendering.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
     dynamic_rendering.dynamicRendering = VK_TRUE;
-    feature_struct_ptr.push_back(&dynamic_rendering);
+    if (device.extensions.is_enabled(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME)) {
+      feature_struct_ptr.push_back(&dynamic_rendering);
+    }
 
     VkPhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT
         dynamic_rendering_unused_attachments = {};
@@ -1850,9 +1855,12 @@ GHOST_TSuccess GHOST_ContextVK::initializeDrawingContext()
 #endif
 
 #ifndef __APPLE__
-    required_device_extensions.append(VK_EXT_PROVOKING_VERTEX_EXTENSION_NAME);
+    /* Optional: only affects the flat-shading provoking-vertex convention. */
+    optional_device_extensions.append(VK_EXT_PROVOKING_VERTEX_EXTENSION_NAME);
 #endif
-    required_device_extensions.append(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    /* Optional: absent on Vulkan 1.1 mobile GPUs (e.g. Adreno 642L); the Vulkan
+     * backend falls back to classic render passes when it is not enabled. */
+    optional_device_extensions.append(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     optional_device_extensions.append(VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME);
     optional_device_extensions.append(VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME);
     optional_device_extensions.append(VK_EXT_SHADER_STENCIL_EXPORT_EXTENSION_NAME);

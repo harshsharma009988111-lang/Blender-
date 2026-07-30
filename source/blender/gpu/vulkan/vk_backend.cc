@@ -161,17 +161,16 @@ static Vector<StringRefNull> missing_capabilities_get(VkPhysicalDevice vk_physic
   if (features.features.vertexPipelineStoresAndAtomics == VK_FALSE) {
     missing_capabilities.append("vertex pipeline stores and atomics");
   }
-  if (features.features.multiViewport == VK_FALSE) {
-    missing_capabilities.append("multi viewport");
-  }
+  /* multiViewport, logicOp and provoking-vertex are not hard requirements: the
+   * backend already treats logic_ops as optional, the framebuffer falls back to a
+   * single viewport, and provoking vertex only affects the flat-shading vertex
+   * convention. Requiring them excludes otherwise-capable mobile GPUs (all Adreno
+   * lack logicOp), so they are not rejected here. */
   if (features.features.shaderClipDistance == VK_FALSE) {
     missing_capabilities.append("shader clip distance");
   }
   if (features.features.fragmentStoresAndAtomics == VK_FALSE) {
     missing_capabilities.append("fragment stores and atomics");
-  }
-  if (features.features.logicOp == VK_FALSE) {
-    missing_capabilities.append("logical operations");
   }
   if (features.features.dualSrcBlend == VK_FALSE) {
     missing_capabilities.append("dual source blending");
@@ -210,15 +209,9 @@ static Vector<StringRefNull> missing_capabilities_get(VkPhysicalDevice vk_physic
   if (!extensions.contains(VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
     missing_capabilities.append(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
   }
-  if (!extensions.contains(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME)) {
-    missing_capabilities.append(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
-  }
-#ifndef __APPLE__
-  /* Metal doesn't support provoking vertex. */
-  if (!extensions.contains(VK_EXT_PROVOKING_VERTEX_EXTENSION_NAME)) {
-    missing_capabilities.append(VK_EXT_PROVOKING_VERTEX_EXTENSION_NAME);
-  }
-#endif
+  /* VK_KHR_dynamic_rendering (core in Vulkan 1.3) is not required: when absent the
+   * backend falls back to classic render passes. Provoking vertex is likewise
+   * optional (only the flat-shading vertex convention differs without it). */
 
   return missing_capabilities;
 }
@@ -530,6 +523,7 @@ void VKBackend::detect_workarounds(VKDevice &device)
     extensions.shader_output_layer = false;
     extensions.shader_output_viewport_index = false;
     extensions.fragment_shader_barycentric = false;
+    extensions.dynamic_rendering = true;
     extensions.dynamic_rendering_local_read = false;
     extensions.dynamic_rendering_unused_attachments = false;
     extensions.pageable_device_local_memory = false;
@@ -556,11 +550,21 @@ void VKBackend::detect_workarounds(VKDevice &device)
   extensions.wide_lines = device.physical_device_features_get().wideLines;
   extensions.fragment_shader_barycentric = device.supports_extension(
       VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
-  extensions.dynamic_rendering_local_read = device.supports_extension(
-      VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME);
-  extensions.dynamic_rendering_unused_attachments = device.supports_extension(
-      VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME);
+  /* Core in Vulkan 1.3 but still advertised as an extension by all current
+   * drivers that support it. When absent (Vulkan 1.1 mobile GPUs such as the
+   * Adreno 642L) the backend uses the render-pass fallback. Kept extension-based
+   * to stay in lock-step with GHOST_ContextVK device creation. */
+  extensions.dynamic_rendering = device.supports_extension(
+      VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+  extensions.dynamic_rendering_local_read =
+      extensions.dynamic_rendering &&
+      device.supports_extension(VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME);
+  extensions.dynamic_rendering_unused_attachments =
+      extensions.dynamic_rendering &&
+      device.supports_extension(VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME);
   extensions.logic_ops = device.physical_device_features_get().logicOp;
+  extensions.provoking_vertex = device.supports_extension(
+      VK_EXT_PROVOKING_VERTEX_EXTENSION_NAME);
   extensions.maintenance4 = device.supports_extension(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
   extensions.memory_priority = device.supports_extension(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME);
   extensions.pageable_device_local_memory = device.supports_extension(
