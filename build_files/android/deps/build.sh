@@ -220,6 +220,36 @@ build_jpeg() {
     -DWITH_TURBOJPEG=OFF
 }
 
+build_openjpeg() {
+  local v; v="$(dep_version OPENJPEG_VERSION)"
+  fetch "openjpeg-$v.tar.gz" "https://github.com/uclouvain/openjpeg/archive/v$v.tar.gz"
+  local src; src="$(extract "openjpeg-$v.tar.gz" openjpeg)"
+  cmake_install "$src" openjpeg -DBUILD_CODEC=OFF
+}
+
+build_expat() {
+  local v; v="$(dep_version EXPAT_VERSION)"  # underscore form, e.g. 2_7_5
+  fetch "expat-$v.tar.gz" "https://github.com/libexpat/libexpat/archive/R_$v.tar.gz"
+  local src; src="$(extract "expat-$v.tar.gz" expat)"
+  cmake_install "$src/expat" expat -DEXPAT_BUILD_TOOLS=OFF -DEXPAT_BUILD_EXAMPLES=OFF -DEXPAT_BUILD_TESTS=OFF
+}
+
+build_yamlcpp() {
+  local v; v="$(dep_version YAMLCPP_VERSION)"
+  fetch "yaml-cpp-$v.tar.gz" "https://github.com/jbeder/yaml-cpp/archive/refs/tags/$v.tar.gz"
+  local src; src="$(extract "yaml-cpp-$v.tar.gz" yamlcpp)"
+  cmake_install "$src" yamlcpp -DYAML_CPP_BUILD_TESTS=OFF -DYAML_CPP_BUILD_TOOLS=OFF
+}
+
+build_blosc() {
+  local v; v="$(dep_version BLOSC_VERSION)"
+  fetch "c-blosc-$v.tar.gz" "https://github.com/Blosc/c-blosc/archive/v$v.tar.gz"
+  local src; src="$(extract "c-blosc-$v.tar.gz" blosc)"
+  cmake_install "$src" blosc \
+    -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF -DBUILD_FUZZERS=OFF \
+    -DPREFER_EXTERNAL_ZLIB=ON -DPREFER_EXTERNAL_ZSTD=ON
+}
+
 build_openexr() {
   local v; v="$(dep_version OPENEXR_VERSION)"
   fetch "openexr-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/openexr/archive/v$v.tar.gz"
