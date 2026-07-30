@@ -18,6 +18,14 @@ if(NOT EXISTS "${LIBDIR}")
 endif()
 message(STATUS "Android LIBDIR = ${LIBDIR}")
 
+# The NDK ships older Vulkan headers; use our up-to-date Vulkan-Headers first.
+include_directories(BEFORE SYSTEM ${LIBDIR}/vulkan/include)
+set(VULKAN_INCLUDE_DIR ${LIBDIR}/vulkan/include)
+set(VULKAN_INCLUDE_DIRS ${LIBDIR}/vulkan/include)
+find_library(VULKAN_LIBRARY vulkan REQUIRED)
+set(VULKAN_LIBRARIES ${VULKAN_LIBRARY})
+set(VULKAN_FOUND ON)
+
 # Find harvested libs by rooting into their prefixes, never host paths.
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM BOTH)
 file(GLOB _android_dep_prefixes "${LIBDIR}/*")

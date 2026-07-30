@@ -713,6 +713,13 @@ build_xml2() {
     -DLIBXML2_WITH_TESTS=OFF -DBUILD_SHARED_LIBS=ON
 }
 
+build_vulkan_headers() {
+  local v; v="$(dep_version VULKAN_VERSION)"
+  fetch "vulkan-headers-$v.tar.gz" "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/vulkan-sdk-$v.0.tar.gz"
+  local src; src="$(extract "vulkan-headers-$v.tar.gz" vulkan-headers)"
+  cmake_install "$src" vulkan
+}
+
 build_materialx() {
   local v; v="$(dep_version MATERIALX_VERSION)"
   fetch "materialx-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/MaterialX/archive/refs/tags/v$v.tar.gz"
