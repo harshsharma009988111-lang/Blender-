@@ -63,6 +63,7 @@ cmake_install() {
     -DANDROID_PLATFORM="android-$ANDROID_API" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="$LIBDIR/$name" \
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
     -DBUILD_TESTING=OFF \
     "$@"
   cmake --build "$build"
@@ -144,6 +145,17 @@ build_pugixml() {
   local src; src="$(extract "pugixml-$v.tar.gz" pugixml)"
   # pugixml 1.10 predates CMake 4's minimum-policy floor.
   cmake_install "$src" pugixml -DBUILD_SHARED_LIBS=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+}
+
+build_jpeg() {
+  local v; v="$(dep_version JPEG_VERSION)"
+  fetch "libjpeg-turbo-$v.tar.gz" "https://github.com/libjpeg-turbo/libjpeg-turbo/archive/$v.tar.gz"
+  local src; src="$(extract "libjpeg-turbo-$v.tar.gz" jpeg)"
+  cmake_install "$src" jpeg \
+    -DENABLE_SHARED=ON \
+    -DENABLE_STATIC=ON \
+    -DWITH_JPEG8=ON \
+    -DWITH_TURBOJPEG=OFF
 }
 
 build_openexr() {
