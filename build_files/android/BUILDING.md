@@ -143,7 +143,8 @@ build_files/android/apk/package.sh
 This gathers `libblender.so` + all transitive `.so` deps (stripped), bundles the
 runtime payload (Python stdlib + numpy, `scripts/`, `datafiles/`) as
 `blender_runtime.zip`, compiles `BlenderActivity`, and assembles a debug-signed
-APK at `../android_apk_stage/blender.apk` (~156 MB, sideloadable).
+APK at `../android_apk_stage_<cfg>/blender-<cfg>.apk`, sideloadable. Sizes:
+**lite ≈ 115 MB**, **full ≈ 166 MB** (129 native libs vs 105).
 
 On first launch `BlenderActivity` extracts the runtime to
 `<filesDir>/blender/5.3/`, which is what `GHOST_SystemPathsAndroid` reports.
