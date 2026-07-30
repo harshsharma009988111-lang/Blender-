@@ -283,6 +283,22 @@ build_opencolorio() {
     -Dminizip-ng_ROOT="$LIBDIR/minizipng" -Dpystring_ROOT="$LIBDIR/pystring"
 }
 
+build_opensubdiv() {
+  local v; v="$(dep_version OPENSUBDIV_VERSION)"  # v3_7_0
+  fetch "opensubdiv-$v.tar.gz" "https://github.com/PixarAnimationStudios/OpenSubdiv/archive/$v.tar.gz"
+  local src; src="$(extract "opensubdiv-$v.tar.gz" opensubdiv)"
+  # NDK ships GLES, so OpenSubdiv enables OSD_GPU with no GPU sources; gate it.
+  sed -i '' 's/if(OPENGLES_FOUND)/if(OPENGLES_FOUND AND NOT NO_OPENGL)/' \
+    "$src/CMakeLists.txt"
+  # Its ANDROID block installs Android.mk to LIBRARY_OUTPUT_PATH_ROOT; set it.
+  cmake_install "$src" opensubdiv \
+    -DTBB_ROOT="$LIBDIR/tbb" \
+    -DLIBRARY_OUTPUT_PATH_ROOT="$LIBDIR/opensubdiv" \
+    -DNO_TUTORIALS=ON -DNO_EXAMPLES=ON -DNO_REGRESSION=ON -DNO_DOC=ON \
+    -DNO_OMP=ON -DNO_CUDA=ON -DNO_OPENCL=ON -DNO_METAL=ON -DNO_DX=ON \
+    -DNO_OPENGL=ON -DNO_TBB=OFF -DNO_PTEX=ON -DNO_GLTESTS=ON -DNO_GLEW=ON -DNO_GLFW=ON
+}
+
 build_openexr() {
   local v; v="$(dep_version OPENEXR_VERSION)"
   fetch "openexr-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/openexr/archive/v$v.tar.gz"
