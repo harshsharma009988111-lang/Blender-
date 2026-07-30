@@ -540,6 +540,37 @@ build_x264() {
   echo "[deps] installed x264 -> $LIBDIR/x264"
 }
 
+build_ffmpeg() {
+  local v; v="$(dep_version FFMPEG_VERSION)"
+  fetch "ffmpeg-$v.tar.xz" "https://ffmpeg.org/releases/ffmpeg-$v.tar.xz"
+  local src; src="$(extract "ffmpeg-$v.tar.xz" ffmpeg)"
+  local pc="" xcf="" xlf=""
+  for d in opus vorbis ogg theora x264 x265 vpx aom openjpeg lame; do
+    pc="$pc${pc:+:}$LIBDIR/$d/lib/pkgconfig"
+    xcf="$xcf -I$LIBDIR/$d/include"
+    xlf="$xlf -L$LIBDIR/$d/lib"
+  done
+  export PKG_CONFIG_LIBDIR="$pc"
+  ( cd "$src" && ./configure \
+      --enable-cross-compile --target-os=android --arch=aarch64 \
+      --cc="$ANDROID_LLVM_BIN/aarch64-linux-android${ANDROID_API}-clang" \
+      --cxx="$ANDROID_LLVM_BIN/aarch64-linux-android${ANDROID_API}-clang++" \
+      --ar="$ANDROID_LLVM_BIN/llvm-ar" --ranlib="$ANDROID_LLVM_BIN/llvm-ranlib" \
+      --strip="$ANDROID_LLVM_BIN/llvm-strip" --nm="$ANDROID_LLVM_BIN/llvm-nm" \
+      --sysroot="$ANDROID_SYSROOT" \
+      --enable-shared --disable-static --enable-pic --disable-programs --disable-doc \
+      --enable-gpl --enable-version3 \
+      --enable-libvpx --enable-libx264 --enable-libx265 --enable-libvorbis \
+      --enable-libtheora --enable-libopus --enable-libmp3lame \
+      --enable-libopenjpeg --enable-libaom \
+      --extra-cflags="$xcf" \
+      --extra-ldflags="$xlf" --extra-libs="-lc++" \
+      --prefix="$LIBDIR/ffmpeg" &&
+    make -j"$(sysctl -n hw.ncpu)" && make install )
+  unset PKG_CONFIG_LIBDIR
+  echo "[deps] installed ffmpeg -> $LIBDIR/ffmpeg"
+}
+
 build_materialx() {
   local v; v="$(dep_version MATERIALX_VERSION)"
   fetch "materialx-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/MaterialX/archive/refs/tags/v$v.tar.gz"
