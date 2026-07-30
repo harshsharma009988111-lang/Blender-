@@ -12,10 +12,10 @@ expat · yaml-cpp · c-blosc · pystring · minizip-ng · OpenColorIO ·
 OpenSubdiv (CPU) · robin-map · OpenImageIO · embree · Alembic · MaterialX ·
 potrace · sqlite · libffi · OpenSSL · **Python 3.13** · OpenVDB(+NanoVDB) ·
 ogg · vorbis · theora · opus · lame · aom · x265 · libvpx · x264 · **ffmpeg** ·
-**OpenUSD 26.03**
+**OpenUSD 26.03** · **LLVM 20.1.8 + clang**
 
-In progress (background build): LLVM (+clang, host tblgen done, cross building).
-After LLVM: OSL (needs LLVM), then wire Blender's main build to lib/android_arm64.
+Next: OSL (needs a host clang matching LLVM to generate bitcode — thorny),
+then a platform_android.cmake to point Blender's main build at lib/android_arm64.
 
 Notes:
 - OpenColorIO: Python bindings off (Python not yet ported), SSE off (arm64);
