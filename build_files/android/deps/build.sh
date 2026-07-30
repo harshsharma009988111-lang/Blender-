@@ -65,6 +65,10 @@ cmake_install() {
     -DCMAKE_INSTALL_PREFIX="$LIBDIR/$name" \
     -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
     -DBUILD_TESTING=OFF \
+    -DCMAKE_FIND_ROOT_PATH="$LIBDIR" \
+    -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=BOTH \
+    -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH \
+    -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH \
     "$@"
   cmake --build "$build"
   cmake --install "$build"
