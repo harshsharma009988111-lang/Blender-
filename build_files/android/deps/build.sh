@@ -98,6 +98,20 @@ build_deflate() {
     -DLIBDEFLATE_BUILD_GZIP=OFF
 }
 
+build_imath() {
+  local v; v="$(dep_version IMATH_VERSION)"
+  fetch "imath-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/Imath/archive/v$v.tar.gz"
+  local src; src="$(extract "imath-$v.tar.gz" imath)"
+  cmake_install "$src" imath -DBUILD_SHARED_LIBS=ON -DPYTHON=OFF -DIMATH_INSTALL_PKG_CONFIG=ON
+}
+
+build_fmt() {
+  local v; v="$(dep_version FMT_VERSION)"
+  fetch "fmt-$v.tar.gz" "https://github.com/fmtlib/fmt/archive/refs/tags/$v.tar.gz"
+  local src; src="$(extract "fmt-$v.tar.gz" fmt)"
+  cmake_install "$src" fmt -DFMT_TEST=OFF -DFMT_DOC=OFF -DBUILD_SHARED_LIBS=OFF
+}
+
 main() {
   [ $# -gt 0 ] || { echo "usage: $0 <dep> [dep...] | all" >&2; exit 1; }
   local targets=("$@")
