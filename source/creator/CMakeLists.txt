@@ -334,6 +334,11 @@ if(WITH_PYTHON_MODULE)
     )
   endif()
 
+elseif(ANDROID)
+  # NativeActivity loads libblender.so and calls android_main (via the glue's
+  # ANativeActivity_onCreate). Build a shared library rather than an executable.
+  add_library(blender SHARED ${SRC})
+  set_target_properties(blender PROPERTIES OUTPUT_NAME blender)
 else()
   add_executable(blender ${EXETYPE} ${SRC})
   if(WITH_CPU_CHECK)
