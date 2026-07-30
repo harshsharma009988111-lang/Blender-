@@ -4,8 +4,34 @@ End-to-end guide to reproduce the Android arm64 build on an Apple-Silicon Mac.
 Target: Android 12+ (minSdk 31), built against Android 14 (targetSdk 34).
 
 > Everything installs into a sibling of the repo:
-> `../lib/android_arm64` (harvested deps), `../build_android_blender` (Blender),
-> `../build_host_tools` (native codegen tools), `../android_apk_stage` (APK stage).
+> `../lib/android_arm64` (harvested deps), `../build_android_<cfg>` (Blender),
+> `../build_host_tools_<cfg>` (native codegen tools), `../android_apk_stage_<cfg>`
+> (APK stage), where `<cfg>` is `full` or `lite`.
+
+## Build configurations
+
+Two feature sets, selected with `-DBLENDER_ANDROID_CONFIG=full|lite` (default
+`full`):
+
+- **full** — everything: Cycles (+embree), USD, MaterialX, OpenVDB, Alembic,
+  LLVM, ffmpeg video codecs. For modern Qualcomm/Exynos flagships.
+- **lite** — those heavy features off; core modelling/sculpt/Python only. For
+  weaker devices and a much smaller APK.
+
+The feature toggles live in `build_files/android/android_features_{common,full,
+lite}.cmake`. The host codegen tools must be built with the **same** config as
+the target (else generated RNA/DNA mismatches), so each config has its own host
+tools + build + stage dirs.
+
+### One-shot build
+
+```bash
+build_files/android/build_apk.sh full     # or: lite
+```
+
+builds the config-matched host tools, cross-compiles `libblender.so`, and
+packages `../android_apk_stage_<cfg>/blender-<cfg>.apk`. The manual steps below
+show what it does under the hood.
 
 ---
 
@@ -87,7 +113,7 @@ datatoc, msgfmt). These must run on the host, so build them natively with the
 
 ```bash
 cmake -S . -B ../build_host_tools -G Ninja \
-  -C build_files/android/android_features.cmake -DWITH_CROSSCOMPILED_TOOLS=OFF
+  -C build_files/android/android_features_full.cmake -DWITH_CROSSCOMPILED_TOOLS=OFF
 ninja -C ../build_host_tools makesdna makesrna datatoc msgfmt shader_tool
 ```
 
@@ -147,6 +173,6 @@ then open `build_files/android/apk` as a project. The gradle app module consumes
   `GHOST_AndroidMain.cc` (NativeActivity `android_main` + inverted loop),
   Vulkan surface in `GHOST_ContextVK`.
 - Platform glue: `build_files/cmake/platform/platform_android.cmake`,
-  `build_files/android/android_features.cmake`.
+  `build_files/android/android_features_full.cmake`.
 - Deps builder: `build_files/android/deps/build.sh` (+ STATUS.md / MISSING.md).
 - APK: `build_files/android/apk/`.

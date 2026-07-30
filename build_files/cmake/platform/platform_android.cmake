@@ -18,6 +18,19 @@ if(NOT EXISTS "${LIBDIR}")
 endif()
 message(STATUS "Android LIBDIR = ${LIBDIR}")
 
+# Feature set: -DBLENDER_ANDROID_CONFIG=lite|full (or env), default full. Must be
+# set early (CROSSCOMPILE_TOOLDIR and find_package guards depend on it). Matches
+# the host codegen-tools build's feature flags exactly.
+if(NOT DEFINED BLENDER_ANDROID_CONFIG)
+  if(DEFINED ENV{BLENDER_ANDROID_CONFIG})
+    set(BLENDER_ANDROID_CONFIG $ENV{BLENDER_ANDROID_CONFIG})
+  else()
+    set(BLENDER_ANDROID_CONFIG full)
+  endif()
+endif()
+message(STATUS "Android config: ${BLENDER_ANDROID_CONFIG}")
+include(${CMAKE_SOURCE_DIR}/build_files/android/android_features_${BLENDER_ANDROID_CONFIG}.cmake)
+
 # pthread/rt are folded into bionic libc; empty stubs satisfy deps that still
 # emit -lpthread/-lrt (created by the deps builder in .stublibs).
 foreach(_lf CMAKE_EXE_LINKER_FLAGS CMAKE_SHARED_LINKER_FLAGS CMAKE_MODULE_LINKER_FLAGS)
@@ -99,7 +112,8 @@ add_definitions(-DVK_USE_PLATFORM_ANDROID_KHR)
 #   ninja -C ../build_host_tools makesdna makesrna datatoc msgfmt shader_tool
 set(WITH_CROSSCOMPILED_TOOLS ON)
 if(NOT DEFINED CROSSCOMPILE_TOOLDIR)
-  set(CROSSCOMPILE_TOOLDIR "${CMAKE_SOURCE_DIR}/../build_host_tools/bin")
+  # Host tools are config-specific (generated code matches the feature set).
+  set(CROSSCOMPILE_TOOLDIR "${CMAKE_SOURCE_DIR}/../build_host_tools_${BLENDER_ANDROID_CONFIG}/bin")
 endif()
 foreach(_tool makesdna makesrna datatoc msgfmt shader_tool)
   if(NOT EXISTS "${CROSSCOMPILE_TOOLDIR}/${_tool}")
@@ -169,8 +183,6 @@ set(WITH_DOC_MANPAGE OFF)
 set(WITH_GPU_SHADER_CPP_COMPILATION OFF)
 set(WITH_CYCLES_HYDRA_RENDER_DELEGATE OFF)
 
-# Shared feature toggles (must match the host codegen-tools build exactly).
-include(${CMAKE_SOURCE_DIR}/build_files/android/android_features.cmake)
 
 # -----------------------------------------------------------------------------
 # Locate the harvested dependencies (mirrors platform_unix for our subset).
@@ -232,11 +244,19 @@ endif()
 find_package_wrapper(OpenColorIO 2.0.0 REQUIRED)
 test_neon_support()  # sets SUPPORTS_NEON_BUILD, so Cycles uses sse2neon not -msse
 find_package_wrapper(sse2neon REQUIRED)
-find_package_wrapper(OpenVDB)
-find_package_wrapper(NanoVDB)
-find_package_wrapper(Alembic)
-find_package_wrapper(USD)
-find_package_wrapper(MaterialX)
+if(WITH_OPENVDB)
+  find_package_wrapper(OpenVDB)
+  find_package_wrapper(NanoVDB)
+endif()
+if(WITH_ALEMBIC)
+  find_package_wrapper(Alembic)
+endif()
+if(WITH_USD)
+  find_package_wrapper(USD)
+endif()
+if(WITH_MATERIALX)
+  find_package_wrapper(MaterialX)
+endif()
 find_package_wrapper(OpenSubdiv)
 find_package_wrapper(Potrace)
 set(meshoptimizer_ROOT ${LIBDIR}/meshoptimizer)

@@ -14,13 +14,14 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 # shellcheck source=/dev/null
 source "$REPO_ROOT/build_files/android/env.sh"
 
+CONFIG="${BLENDER_ANDROID_CONFIG:-full}"
 : "${LIBDIR:=$REPO_ROOT/../lib/android_arm64}"
-BUILD="${BUILD:-$REPO_ROOT/../build_android_blender}"
+BUILD="${BUILD:-$REPO_ROOT/../build_android_$CONFIG}"
 BT="$ANDROID_HOME/build-tools/35.0.1"
 ANDROID_JAR="$ANDROID_HOME/platforms/android-35/android.jar"
-STAGE="$REPO_ROOT/../android_apk_stage"
+STAGE="$REPO_ROOT/../android_apk_stage_$CONFIG"
 JNI="$STAGE/lib/arm64-v8a"
-OUT="$STAGE/blender.apk"
+OUT="$STAGE/blender-$CONFIG.apk"
 
 rm -rf "$STAGE"; mkdir -p "$JNI"
 

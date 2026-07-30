@@ -31,7 +31,7 @@ ogg · vorbis · theora · opus · lame · aom · x265 · libvpx · x264 · **ff
 
 ### Build progress (cross-compile, fixed in order)
 1. ✅ Host codegen tools (WITH_CROSSCOMPILED_TOOLS, native build + import).
-2. ✅ Host/target feature-flag matching (android_features.cmake) — fixed RNA
+2. ✅ Host/target feature-flag matching (android_features_full.cmake) — fixed RNA
    generation mismatch (fluid getters).
 3. ✅ Cycles NEON via sse2neon (test_neon_support), not x86 -msse.
 4. ✅ Host python for build-time scripts (discover_nodes.py).
