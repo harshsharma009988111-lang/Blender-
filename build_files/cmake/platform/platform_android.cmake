@@ -228,6 +228,11 @@ find_package_wrapper(MaterialX)
 find_package_wrapper(OpenSubdiv)
 find_package_wrapper(Potrace)
 
+if(WITH_VULKAN_BACKEND)
+  set(SHADERC_ROOT_DIR ${LIBDIR}/shaderc)
+  find_package_wrapper(ShaderC REQUIRED)
+endif()
+
 if(WITH_CYCLES_EMBREE)
   find_package(Embree 4.0.0 REQUIRED)
 endif()

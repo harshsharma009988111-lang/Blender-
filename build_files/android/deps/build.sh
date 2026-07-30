@@ -772,6 +772,20 @@ EOF
   echo "[deps] installed numpy -> $LIBDIR/python/lib/python3.13/site-packages"
 }
 
+build_shaderc() {
+  local v; v="$(dep_version SHADERC_VERSION)"  # v2025.4
+  fetch "shaderc-$v.tar.gz" "https://github.com/google/shaderc/archive/$v.tar.gz"
+  local src; src="$(extract "shaderc-$v.tar.gz" shaderc)"
+  # shaderc pulls glslang/SPIRV-Tools/SPIRV-Headers into third_party/.
+  ( cd "$src" && /usr/bin/python3 utils/git-sync-deps )
+  cmake_install "$src" shaderc \
+    -DSHADERC_SKIP_TESTS=ON -DSHADERC_SKIP_EXAMPLES=ON \
+    -DSHADERC_SKIP_COPYRIGHT_CHECK=ON \
+    -DSPIRV_SKIP_TESTS=ON -DSPIRV_SKIP_EXECUTABLES=ON \
+    -DENABLE_GLSLANG_BINARIES=OFF \
+    -DBUILD_SHARED_LIBS=OFF -DSHADERC_ENABLE_SHARED_CRT=ON
+}
+
 build_materialx() {
   local v; v="$(dep_version MATERIALX_VERSION)"
   fetch "materialx-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/MaterialX/archive/refs/tags/v$v.tar.gz"
