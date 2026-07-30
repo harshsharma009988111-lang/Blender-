@@ -51,10 +51,10 @@ class GHOST_SystemAndroid : public GHOST_System {
 
   uint16_t getDPIHint();
 
-  /* Soft keyboard, ready to wire once base GHOST gains the on-screen-keyboard
-   * hooks (as the iOS backend added). No JNI needed via NativeActivity. */
-  void showSoftKeyboard();
-  void hideSoftKeyboard();
+  /* Soft keyboard via NativeActivity (no JNI). Note: with NativeActivity the
+   * typed text is not delivered back; hardware keys still work as key events. */
+  GHOST_TSuccess popupOnScreenKeyboard(GHOST_IWindow *window) override;
+  GHOST_TSuccess hideOnScreenKeyboard(GHOST_IWindow *window) override;
 
   /* Called by the glue when Android (re)creates or destroys the surface. */
   void handleNativeWindowInit(android_app *app);

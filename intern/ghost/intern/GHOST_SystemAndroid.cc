@@ -336,16 +336,20 @@ uint16_t GHOST_SystemAndroid::getDPIHint()
   return 288;
 }
 
-void GHOST_SystemAndroid::showSoftKeyboard()
+GHOST_TSuccess GHOST_SystemAndroid::popupOnScreenKeyboard(GHOST_IWindow * /*window*/)
 {
-  if (app_ && app_->activity) {
-    ANativeActivity_showSoftInput(app_->activity, ANATIVEACTIVITY_SHOW_SOFT_INPUT_IMPLICIT);
+  if (!app_ || !app_->activity) {
+    return GHOST_kFailure;
   }
+  ANativeActivity_showSoftInput(app_->activity, ANATIVEACTIVITY_SHOW_SOFT_INPUT_IMPLICIT);
+  return GHOST_kSuccess;
 }
 
-void GHOST_SystemAndroid::hideSoftKeyboard()
+GHOST_TSuccess GHOST_SystemAndroid::hideOnScreenKeyboard(GHOST_IWindow * /*window*/)
 {
-  if (app_ && app_->activity) {
-    ANativeActivity_hideSoftInput(app_->activity, ANATIVEACTIVITY_HIDE_SOFT_INPUT_IMPLICIT_ONLY);
+  if (!app_ || !app_->activity) {
+    return GHOST_kFailure;
   }
+  ANativeActivity_hideSoftInput(app_->activity, ANATIVEACTIVITY_HIDE_SOFT_INPUT_IMPLICIT_ONLY);
+  return GHOST_kSuccess;
 }

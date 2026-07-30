@@ -3907,6 +3907,8 @@ static void textedit_begin(bContext *C, Button *but, HandleButtonData *data)
   GHOST_ISystem *ghost_system = GHOST_ISystem::getSystem();
   ghost_system->setAutoFocus(false);
 
+  ghost_system->popupOnScreenKeyboard(static_cast<GHOST_IWindow *>(win->runtime->ghostwin));
+
 #ifdef WITH_INPUT_IME
   if (!is_num_but) {
     textedit_ime_begin(win, but);
@@ -3974,6 +3976,8 @@ static void textedit_end(bContext *C, Button *but, HandleButtonData *data)
   /* Turn back on the auto-focusing of windows. */
   GHOST_ISystem *ghost_system = GHOST_ISystem::getSystem();
   ghost_system->setAutoFocus(true);
+
+  ghost_system->hideOnScreenKeyboard(static_cast<GHOST_IWindow *>(win->runtime->ghostwin));
 
   /* Free text undo history text blocks. */
   textedit_undo_stack_destroy(text_edit.undo_stack_text);
