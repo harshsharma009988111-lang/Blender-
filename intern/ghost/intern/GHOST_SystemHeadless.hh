@@ -129,6 +129,9 @@ class GHOST_SystemHeadless : public GHOST_System {
 #  elif defined(__APPLE__)
         GHOST_Context *context = new GHOST_ContextVK(
             context_params_offscreen, nullptr, 1, 2, gpu_settings.preferred_device);
+#  elif defined(__ANDROID__)
+        GHOST_Context *context = new GHOST_ContextVK(
+            context_params_offscreen, (ANativeWindow *)nullptr, 1, 2, gpu_settings.preferred_device);
 #  else
         GHOST_Context *context = new GHOST_ContextVK(context_params_offscreen,
                                                      GHOST_kVulkanPlatformHeadless,

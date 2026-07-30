@@ -606,6 +606,9 @@ build_usd() {
   local src; src="$(extract "openusd-$v.tar.gz" usd)"
   # Blender's patch removes the Boost dependency.
   patch -p1 -d "$src" < "$REPO_ROOT/build_files/build_environment/patches/usd_noboost.diff"
+  # Android uses libc++ (no __gnu_cxx); don't enable GNU STL extensions there.
+  sed -i '' 's/#if defined(ARCH_OS_LINUX) \&\& defined(ARCH_COMPILER_GCC)/#if defined(ARCH_OS_LINUX) \&\& defined(ARCH_COMPILER_GCC) \&\& !defined(__ANDROID__)/' \
+    "$src/pxr/base/arch/defines.h"
   cmake_install "$src" usd \
     -DPXR_BUILD_MONOLITHIC=ON \
     -DPXR_ENABLE_PYTHON_SUPPORT=OFF \
