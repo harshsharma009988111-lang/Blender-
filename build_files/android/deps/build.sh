@@ -52,6 +52,16 @@ extract() {
   echo "$dir"
 }
 
+# Semicolon-separated list of all installed dep prefixes, used as find roots so
+# find_*() locate our libs (rooted, mode ONLY) without picking up host libs.
+find_roots() {
+  local roots="" d
+  for d in "$LIBDIR"/*/; do
+    [ -d "$d" ] && roots="$roots${roots:+;}${d%/}"
+  done
+  echo "$roots"
+}
+
 # Configure/build/install a CMake-based dependency for Android.
 # $1 src dir, $2 install name, rest: extra cmake args.
 cmake_install() {
@@ -65,10 +75,7 @@ cmake_install() {
     -DCMAKE_INSTALL_PREFIX="$LIBDIR/$name" \
     -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
     -DBUILD_TESTING=OFF \
-    -DCMAKE_FIND_ROOT_PATH="$LIBDIR" \
-    -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=BOTH \
-    -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH \
-    -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH \
+    -DCMAKE_FIND_ROOT_PATH="$(find_roots)" \
     "$@"
   cmake --build "$build"
   cmake --install "$build"
