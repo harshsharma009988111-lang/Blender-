@@ -507,6 +507,39 @@ build_aom() {
     -DENABLE_TOOLS=OFF -DENABLE_DOCS=OFF
 }
 
+build_vpx() {
+  local v; v="$(dep_version VPX_VERSION)"
+  fetch "libvpx-v$v.tar.gz" "https://github.com/webmproject/libvpx/archive/v$v/libvpx-v$v.tar.gz"
+  local src; src="$(extract "libvpx-v$v.tar.gz" vpx)"
+  export CC="$ANDROID_LLVM_BIN/aarch64-linux-android${ANDROID_API}-clang"
+  export CXX="$ANDROID_LLVM_BIN/aarch64-linux-android${ANDROID_API}-clang++"
+  export LD="$CC" AR="$ANDROID_LLVM_BIN/llvm-ar" \
+    STRIP="$ANDROID_LLVM_BIN/llvm-strip" NM="$ANDROID_LLVM_BIN/llvm-nm"
+  ( cd "$src" && ./configure --target=arm64-android-gcc \
+      --disable-examples --disable-tools --disable-docs --disable-unit-tests \
+      --enable-pic --enable-vp8 --enable-vp9 --enable-static --disable-shared \
+      --prefix="$LIBDIR/vpx" &&
+    make -j"$(sysctl -n hw.ncpu)" && make install )
+  unset CC CXX LD AR STRIP NM
+  echo "[deps] installed vpx -> $LIBDIR/vpx"
+}
+
+build_x264() {
+  local v; v="$(dep_version X264_VERSION)"
+  fetch "x264-$v.tar.gz" "https://code.videolan.org/videolan/x264/-/archive/$v/x264-$v.tar.gz"
+  local src; src="$(extract "x264-$v.tar.gz" x264)"
+  export CC="$ANDROID_LLVM_BIN/aarch64-linux-android${ANDROID_API}-clang"
+  export AR="$ANDROID_LLVM_BIN/llvm-ar" RANLIB="$ANDROID_LLVM_BIN/llvm-ranlib" \
+    STRIP="$ANDROID_LLVM_BIN/llvm-strip"
+  ( cd "$src" && ./configure --host=aarch64-linux-android \
+      --cross-prefix="$ANDROID_LLVM_BIN/llvm-" --sysroot="$ANDROID_SYSROOT" \
+      --enable-pic --enable-shared --disable-cli --disable-static \
+      --prefix="$LIBDIR/x264" &&
+    make -j"$(sysctl -n hw.ncpu)" && make install )
+  unset CC AR RANLIB STRIP
+  echo "[deps] installed x264 -> $LIBDIR/x264"
+}
+
 build_materialx() {
   local v; v="$(dep_version MATERIALX_VERSION)"
   fetch "materialx-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/MaterialX/archive/refs/tags/v$v.tar.gz"

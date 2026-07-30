@@ -30,6 +30,7 @@ export ANDROID_TARGET_API="${ANDROID_TARGET_API:-34}"
 export ANDROID_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake"
 # Host prebuilt dir (NDK ships x86_64 host binaries; run under Rosetta on Apple Silicon).
 export ANDROID_LLVM_BIN="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/darwin-x86_64/bin"
+export ANDROID_SYSROOT="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/darwin-x86_64/sysroot"
 
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_LLVM_BIN:$PATH"
 
