@@ -675,6 +675,41 @@ build_spirv_reflect() {
     -DSPIRV_REFLECT_STATIC_LIB=ON
 }
 
+build_lzma() {
+  local v; v="$(dep_version LZMA_VERSION)"
+  fetch "xz-$v.tar.bz2" "https://tukaani.org/xz/xz-$v.tar.bz2"
+  local src; src="$(extract "xz-$v.tar.bz2" lzma)"
+  autotools_install "$src" lzma --disable-static --enable-shared \
+    --disable-xz --disable-xzdec --disable-lzmadec --disable-lzmainfo --disable-scripts
+}
+
+build_bzip2() {
+  local v; v="$(dep_version BZIP2_VERSION)"
+  fetch "bzip2-$v.tar.gz" "https://sourceware.org/pub/bzip2/bzip2-$v.tar.gz"
+  local src; src="$(extract "bzip2-$v.tar.gz" bzip2)"
+  # bzip2 has no configure; compile libbz2 directly with the NDK.
+  local cc="$ANDROID_LLVM_BIN/aarch64-linux-android${ANDROID_API}-clang"
+  local srcs="blocksort.c huffman.c crctable.c randtable.c compress.c decompress.c bzlib.c"
+  ( cd "$src" &&
+    $cc -fPIC -O2 -c $srcs &&
+    $cc -shared -Wl,-soname,libbz2.so.1.0 -o libbz2.so.1.0.8 *.o &&
+    mkdir -p "$LIBDIR/bzip2/lib" "$LIBDIR/bzip2/include" &&
+    cp libbz2.so.1.0.8 "$LIBDIR/bzip2/lib/libbz2.so" &&
+    cp bzlib.h "$LIBDIR/bzip2/include/" )
+  echo "[deps] installed bzip2 -> $LIBDIR/bzip2"
+}
+
+build_xml2() {
+  local v; v="$(dep_version XML2_VERSION)"
+  local mm="${v%.*}"  # 2.14
+  fetch "libxml2-$v.tar.xz" "https://download.gnome.org/sources/libxml2/$mm/libxml2-$v.tar.xz"
+  local src; src="$(extract "libxml2-$v.tar.xz" xml2)"
+  cmake_install "$src" xml2 \
+    -DLIBXML2_WITH_PYTHON=OFF -DLIBXML2_WITH_ICONV=OFF \
+    -DLIBXML2_WITH_LZMA=ON -DLIBXML2_WITH_ZLIB=ON \
+    -DLIBXML2_WITH_TESTS=OFF -DBUILD_SHARED_LIBS=ON
+}
+
 build_materialx() {
   local v; v="$(dep_version MATERIALX_VERSION)"
   fetch "materialx-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/MaterialX/archive/refs/tags/v$v.tar.gz"
