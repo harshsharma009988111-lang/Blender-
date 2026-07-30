@@ -12,6 +12,7 @@
 
     <application
         android:label="Blender"
+        android:icon="@drawable/ic_launcher"
         android:hasCode="true"
         android:allowBackup="true"
         android:extractNativeLibs="true"

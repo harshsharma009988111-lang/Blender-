@@ -109,9 +109,15 @@ mkdir -p "$STAGE/javac" "$STAGE/dex"
 "$BT/d8" --min-api "$ANDROID_API" --output "$STAGE/dex" \
   $(find "$STAGE/javac" -name '*.class')
 
+echo "[apk] compiling resources (launcher icon)"
+RES_SRC="$SCRIPT_DIR/app/src/main/res"
+mkdir -p "$STAGE/rescompiled"
+"$BT/aapt2" compile --dir "$RES_SRC" -o "$STAGE/rescompiled/res.zip"
+
 echo "[apk] linking resources"
 "$BT/aapt2" link -o "$STAGE/base.apk" -I "$ANDROID_JAR" \
   --manifest "$SCRIPT_DIR/app/src/main/AndroidManifest.xml" \
+  -R "$STAGE/rescompiled/res.zip" \
   -A "$ASSETS" -0 zip \
   --min-sdk-version "$ANDROID_API" --target-sdk-version "$ANDROID_TARGET_API"
 
