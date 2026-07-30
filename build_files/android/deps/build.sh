@@ -172,6 +172,36 @@ build_freetype() {
     -DBUILD_SHARED_LIBS=ON
 }
 
+build_harfbuzz() {
+  local v; v="$(dep_version HARFBUZZ_VERSION)"
+  fetch "harfbuzz-$v.tar.gz" "https://github.com/harfbuzz/harfbuzz/archive/refs/tags/$v.tar.gz"
+  local src; src="$(extract "harfbuzz-$v.tar.gz" harfbuzz)"
+  cmake_install "$src" harfbuzz \
+    -DCMAKE_PREFIX_PATH="$LIBDIR/freetype" \
+    -DHB_HAVE_FREETYPE=ON \
+    -DHB_BUILD_SUBSET=OFF \
+    -DBUILD_SHARED_LIBS=ON
+}
+
+build_tiff() {
+  local v; v="$(dep_version TIFF_VERSION)"
+  fetch "tiff-$v.tar.gz" "https://download.osgeo.org/libtiff/tiff-$v.tar.gz"
+  local src; src="$(extract "tiff-$v.tar.gz" tiff)"
+  cmake_install "$src" tiff \
+    -DCMAKE_PREFIX_PATH="$LIBDIR/zlib;$LIBDIR/jpeg;$LIBDIR/zstd" \
+    -Dtiff-tools=OFF -Dtiff-tests=OFF -Dtiff-docs=OFF
+}
+
+build_webp() {
+  local v; v="$(dep_version WEBP_VERSION)"
+  fetch "libwebp-$v.tar.gz" "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-$v.tar.gz"
+  local src; src="$(extract "libwebp-$v.tar.gz" webp)"
+  cmake_install "$src" webp \
+    -DWEBP_BUILD_ANIM_UTILS=OFF -DWEBP_BUILD_CWEBP=OFF -DWEBP_BUILD_DWEBP=OFF \
+    -DWEBP_BUILD_GIF2WEBP=OFF -DWEBP_BUILD_IMG2WEBP=OFF -DWEBP_BUILD_VWEBP=OFF \
+    -DWEBP_BUILD_WEBPINFO=OFF -DWEBP_BUILD_WEBPMUX=OFF -DWEBP_BUILD_EXTRAS=OFF
+}
+
 build_jpeg() {
   local v; v="$(dep_version JPEG_VERSION)"
   fetch "libjpeg-turbo-$v.tar.gz" "https://github.com/libjpeg-turbo/libjpeg-turbo/archive/$v.tar.gz"
