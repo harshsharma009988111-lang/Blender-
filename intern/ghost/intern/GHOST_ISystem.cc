@@ -28,6 +28,8 @@
 #  include "GHOST_SystemWin32.hh"
 #elif defined(__APPLE__)
 #  include "GHOST_SystemCocoa.hh"
+#elif defined(WITH_GHOST_ANDROID)
+#  include "GHOST_SystemAndroid.hh"
 #endif
 
 #include "CLG_log.h"
@@ -161,6 +163,10 @@ GHOST_TSuccess GHOST_ISystem::createSystem(bool verbose, [[maybe_unused]] bool b
     backends_attempted.push_back({"COCOA"});
     CLOG_INFO(&LOG, "Create Cocoa system");
     system_ = new GHOST_SystemCocoa();
+#elif defined(WITH_GHOST_ANDROID)
+    backends_attempted.push_back({"ANDROID"});
+    CLOG_INFO(&LOG, "Create Android system");
+    system_ = new GHOST_SystemAndroid();
 #endif
 
     if (system_) {
