@@ -15,15 +15,14 @@
 #include <android_native_app_glue.h>
 #include <jni.h>
 
-struct bContext;
-
 namespace blender {
+struct bContext;
 /* Implemented in creator: runs Blender init + WM_main_entry, hands C back. */
 int GHOST_android_launch(int argc, const char **argv);
 void WM_main_loop_body(bContext *C);
 }  // namespace blender
 
-static bContext *g_context = nullptr;
+static blender::bContext *g_context = nullptr;
 static bool g_blender_launched = false;
 
 namespace blender {
