@@ -126,6 +126,19 @@ build_tbb() {
     -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--undefined-version"
 }
 
+build_openexr() {
+  local v; v="$(dep_version OPENEXR_VERSION)"
+  fetch "openexr-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/openexr/archive/v$v.tar.gz"
+  local src; src="$(extract "openexr-$v.tar.gz" openexr)"
+  cmake_install "$src" openexr \
+    -DCMAKE_PREFIX_PATH="$LIBDIR/imath;$LIBDIR/deflate;$LIBDIR/zlib" \
+    -DBUILD_SHARED_LIBS=ON \
+    -DOPENEXR_BUILD_TOOLS=OFF \
+    -DOPENEXR_INSTALL_TOOLS=OFF \
+    -DOPENEXR_INSTALL_EXAMPLES=OFF \
+    -DOPENEXR_BUILD_EXAMPLES=OFF
+}
+
 main() {
   [ $# -gt 0 ] || { echo "usage: $0 <dep> [dep...] | all" >&2; exit 1; }
   local targets=("$@")
