@@ -61,6 +61,26 @@ opencolorio, openimageio, osl, python, rubberband, usd, x265(apple).
 Key proof point: Python, LLVM and USD are all in there — the mobile port is
 known-possible, not speculative.
 
+## Python (the critical path) — approach
+
+CPython 3.13 has official Android support (PEP 738), so use it instead of the
+iOS patch (which is Apple-specific: Darwin cross hacks + force-crosscompile
+because iOS builds on a same-arch Mac — irrelevant here).
+
+Plan:
+1. Host interpreter must match target version. Host has 3.12; build CPython
+   3.13.13 natively first (`./configure && make`) to get a `python3.13` for
+   `--with-build-python` / `PYTHON_FOR_BUILD`.
+2. Cross-compile with the NDK: `--host=aarch64-linux-android --build=<config.guess>`,
+   `--with-build-python=<host 3.13>`, `--disable-test-modules`,
+   `ac_cv_file__dev_ptmx=no ac_cv_file__dev_ptc=no`, and point `--with-openssl`,
+   sqlite, zlib, libffi at the harvest prefix. CPython's `Android/android.py`
+   automates most of this (configure-build-python → configure-host → make-host).
+3. Needs libffi + OpenSSL cross-compiled first (add build_libffi, build_openssl).
+4. Install to `$LIBDIR/python`; then re-enable Python bindings in OCIO/OIIO/USD.
+
+This is a dedicated multi-stage effort — do it as its own focused pass.
+
 ## Next steps
 
 1. Patch + build OpenSubdiv.
