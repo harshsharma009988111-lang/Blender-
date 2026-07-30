@@ -147,6 +147,27 @@ build_pugixml() {
   cmake_install "$src" pugixml -DBUILD_SHARED_LIBS=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 }
 
+build_brotli() {
+  local v; v="$(dep_version BROTLI_VERSION)"
+  fetch "brotli-$v.tar.gz" "https://github.com/google/brotli/archive/refs/tags/v$v.tar.gz"
+  local src; src="$(extract "brotli-$v.tar.gz" brotli)"
+  cmake_install "$src" brotli -DBROTLI_DISABLE_TESTS=ON
+}
+
+build_freetype() {
+  local v; v="$(dep_version FREETYPE_VERSION)"
+  fetch "freetype-$v.tar.gz" "https://downloads.sourceforge.net/freetype/freetype-$v.tar.gz"
+  local src; src="$(extract "freetype-$v.tar.gz" freetype)"
+  cmake_install "$src" freetype \
+    -DCMAKE_PREFIX_PATH="$LIBDIR/zlib;$LIBDIR/png;$LIBDIR/brotli" \
+    -DFT_REQUIRE_ZLIB=ON \
+    -DFT_REQUIRE_PNG=ON \
+    -DFT_REQUIRE_BROTLI=ON \
+    -DFT_DISABLE_HARFBUZZ=ON \
+    -DFT_DISABLE_BZIP2=ON \
+    -DBUILD_SHARED_LIBS=ON
+}
+
 build_jpeg() {
   local v; v="$(dep_version JPEG_VERSION)"
   fetch "libjpeg-turbo-$v.tar.gz" "https://github.com/libjpeg-turbo/libjpeg-turbo/archive/$v.tar.gz"
