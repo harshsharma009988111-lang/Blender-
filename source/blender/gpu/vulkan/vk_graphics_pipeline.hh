@@ -86,6 +86,16 @@ struct VKGraphicsPipelineCreateInfoBuilder {
     build_color_blend_attachment_states(graphics_info.fragment_out);
     build_color_blend_state(graphics_info.fragment_out, extensions);
     build_dynamic_rendering(graphics_info.fragment_out);
+
+    /* Render-pass fallback: pipelines need a compatible VkRenderPass instead of
+     * the dynamic-rendering pNext chain. */
+    if (!extensions.dynamic_rendering) {
+      const VKGraphicsInfo::FragmentOut &fo = graphics_info.fragment_out;
+      vk_graphics_pipeline_create_info.pNext = nullptr;
+      vk_graphics_pipeline_create_info.renderPass = device.render_pass_fallback.compat_render_pass_get(
+          fo.color_attachment_formats, fo.depth_attachment_format, fo.stencil_attachment_format);
+      vk_graphics_pipeline_create_info.subpass = 0;
+    }
   }
 
   /**

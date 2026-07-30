@@ -751,6 +751,16 @@ void VKFrameBuffer::rendering_ensure_dynamic_rendering(VKContext &context,
     break;
   }
 
+  /* Attachment formats for the render-pass fallback (devices without dynamic
+   * rendering). Kept alongside the rendering info so the emission point can
+   * synthesize a compatible VkRenderPass. */
+  for (int i = 0; i < 8; i++) {
+    begin_rendering.node_data.color_formats[i] =
+        i < color_attachment_formats_.size() ? color_attachment_formats_[i] : VK_FORMAT_UNDEFINED;
+  }
+  begin_rendering.node_data.depth_format = depth_attachment_format_;
+  begin_rendering.node_data.stencil_format = stencil_attachment_format_;
+
   context.render_graph().add_node(begin_rendering);
 }
 

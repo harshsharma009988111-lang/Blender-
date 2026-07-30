@@ -20,6 +20,9 @@ namespace gpu::render_graph {
 class VKCommandBufferInterface {
  public:
   bool use_dynamic_rendering_local_read = true;
+  /** When set, the device lacks VK_KHR_dynamic_rendering; use the render-pass
+   * fallback (begin_render_pass/end_render_pass) instead of begin/end_rendering. */
+  bool use_render_pass_fallback = false;
 
   VKCommandBufferInterface() {}
   virtual ~VKCommandBufferInterface() = default;
@@ -148,6 +151,12 @@ class VKCommandBufferInterface {
   /* VK_KHR_dynamic_rendering */
   virtual void begin_rendering(const VkRenderingInfo *p_rendering_info) = 0;
   virtual void end_rendering() = 0;
+  /* Render-pass fallback (no dynamic rendering). */
+  virtual void begin_render_pass(VkRenderPass vk_render_pass,
+                                 VkFramebuffer vk_framebuffer,
+                                 const VkRect2D &render_area,
+                                 Span<VkClearValue> clear_values) = 0;
+  virtual void end_render_pass() = 0;
   /* VK_EXT_debug_utils */
   virtual void begin_debug_utils_label(const VkDebugUtilsLabelEXT *vk_debug_utils_label) = 0;
   virtual void end_debug_utils_label() = 0;
@@ -284,6 +293,11 @@ class VKCommandBufferWrapper : public VKCommandBufferInterface {
   void reset_query_pool(VkQueryPool, uint32_t first_query, uint32_t query_count) override;
   void begin_rendering(const VkRenderingInfo *p_rendering_info) override;
   void end_rendering() override;
+  void begin_render_pass(VkRenderPass vk_render_pass,
+                         VkFramebuffer vk_framebuffer,
+                         const VkRect2D &render_area,
+                         Span<VkClearValue> clear_values) override;
+  void end_render_pass() override;
   void begin_debug_utils_label(const VkDebugUtilsLabelEXT *vk_debug_utils_label) override;
   void end_debug_utils_label() override;
 
@@ -292,6 +306,16 @@ class VKCommandBufferWrapper : public VKCommandBufferInterface {
       const VkAccelerationStructureBuildGeometryInfoKHR *p_infos,
       const VkAccelerationStructureBuildRangeInfoKHR *p_build_range_infos) override;
 };
+
+struct VKBeginRenderingData;
+
+/* Render-pass fallback helpers (defined in vk_render_pass_fallback.cc). They
+ * synthesize a VkRenderPass + VkFramebuffer from the begin-rendering data and
+ * record begin/end render pass. Used when the device lacks dynamic rendering. */
+void begin_rendering_fallback(VKCommandBufferInterface &command_buffer,
+                              const VKBeginRenderingData &data);
+void end_rendering_fallback(VKCommandBufferInterface &command_buffer);
+
 }  // namespace gpu::render_graph
 
 }  // namespace blender

@@ -271,6 +271,7 @@ set(VULKAN_SRC
   vulkan/vk_memory_pool.cc
   vulkan/vk_pipeline_pool.cc
   vulkan/vk_pixel_buffer.cc
+  vulkan/vk_render_pass_fallback.cc
   vulkan/vk_push_constants.cc
   vulkan/vk_query.cc
   vulkan/vk_ray_tracing.cc
@@ -325,6 +326,7 @@ set(VULKAN_SRC
   vulkan/vk_memory_layout.hh
   vulkan/vk_memory_pool.hh
   vulkan/vk_pipeline_pool.hh
+  vulkan/vk_render_pass_fallback.hh
   vulkan/vk_pixel_buffer.hh
   vulkan/vk_push_constants.hh
   vulkan/vk_query.hh

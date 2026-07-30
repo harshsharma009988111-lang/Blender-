@@ -24,6 +24,7 @@
 #include "vk_descriptor_set_layouts.hh"
 #include "vk_memory_pool.hh"
 #include "vk_pipeline_pool.hh"
+#include "vk_render_pass_fallback.hh"
 #include "vk_resource_pool.hh"
 #include "vk_samplers.hh"
 #include "vk_vertex_attribute_object.hh"
@@ -257,6 +258,8 @@ class VKDevice : public NonCopyable {
   VKDiscardPool orphaned_data_render;
   VKPipelinePool pipelines;
   VKVertexInputDescriptionPool vertex_input_descriptions;
+  /** Render-pass/framebuffer emulation for GPUs without dynamic rendering. */
+  VKRenderPassFallback render_pass_fallback;
 
   /** Buffer to bind to unbound resource locations. */
   VKBuffer dummy_buffer;

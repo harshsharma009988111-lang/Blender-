@@ -446,7 +446,12 @@ void VKCommandBuilder::groups_build_commands(VKRenderGraph &render_graph,
       /* Suspend rendering as the next node group will contain data transfer/dispatch commands.
        */
       rendering_active = false;
-      command_buffer.end_rendering();
+      if (command_buffer.use_render_pass_fallback) {
+        command_buffer.end_render_pass();
+      }
+      else {
+        command_buffer.end_rendering();
+      }
     }
 
     /* Record group post barriers. */

@@ -117,6 +117,7 @@ void VKDevice::deinit()
   }
   pipelines.write_to_disk();
   pipelines.free_data(*this);
+  render_pass_fallback.deinit();
   descriptor_set_layouts_.deinit();
   vma_pools.deinit(*this);
   mem_allocator_ = VK_NULL_HANDLE;
@@ -174,6 +175,9 @@ void VKDevice::init(GHOST_IContext *ghost_context)
   debug::object_label(vk_queue_, "GenericQueue");
 
   resources.use_dynamic_rendering_local_read = extensions_.dynamic_rendering_local_read;
+  if (!extensions_.dynamic_rendering) {
+    render_pass_fallback.init(vk_handle(), functions);
+  }
   orphaned_data.timeline_ = 0;
 
   init_submission_thread();

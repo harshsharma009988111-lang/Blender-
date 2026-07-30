@@ -17,6 +17,7 @@ VKCommandBufferWrapper::VKCommandBufferWrapper(VkCommandBuffer vk_command_buffer
     : vk_command_buffer_(vk_command_buffer), functions(&functions)
 {
   use_dynamic_rendering_local_read = extensions.dynamic_rendering_local_read;
+  use_render_pass_fallback = !extensions.dynamic_rendering;
 }
 
 void VKCommandBufferWrapper::begin_recording()
@@ -317,6 +318,25 @@ void VKCommandBufferWrapper::end_rendering()
 {
   BLI_assert(functions->vkCmdEndRenderingKHR);
   functions->vkCmdEndRenderingKHR(vk_command_buffer_);
+}
+
+void VKCommandBufferWrapper::begin_render_pass(VkRenderPass vk_render_pass,
+                                               VkFramebuffer vk_framebuffer,
+                                               const VkRect2D &render_area,
+                                               Span<VkClearValue> clear_values)
+{
+  VkRenderPassBeginInfo begin_info = {VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+  begin_info.renderPass = vk_render_pass;
+  begin_info.framebuffer = vk_framebuffer;
+  begin_info.renderArea = render_area;
+  begin_info.clearValueCount = uint32_t(clear_values.size());
+  begin_info.pClearValues = clear_values.data();
+  functions->vkCmdBeginRenderPass(vk_command_buffer_, &begin_info, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void VKCommandBufferWrapper::end_render_pass()
+{
+  functions->vkCmdEndRenderPass(vk_command_buffer_);
 }
 
 void VKCommandBufferWrapper::begin_query(VkQueryPool vk_query_pool,
