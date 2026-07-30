@@ -157,3 +157,11 @@ This is a dedicated multi-stage effort — do it as its own focused pass.
 3. Tackle the hard tier; Python is the critical path for running Blender.
 4. Point Blender's main build at `lib/android_arm64` (a `platform_android.cmake`
    under `build_files/cmake/platform/`), analogous to the desktop platforms.
+
+## ✅ BLENDER LINKS FOR ANDROID
+`bin/blender` builds as an arm64 Android ELF (full build [4577/4577], exit 0).
+Final-link fixes: pthread/rt stubs, TBB::tbbmalloc, volk VK_USE_PLATFORM_ANDROID_KHR.
+All deps done incl. Python+numpy, LLVM, USD(+python), OpenVDB, ffmpeg, OIIO,
+Cycles(NEON), Vulkan+shaderc, MaterialX, embree, OpenSubdiv.
+minSdk 31 (Android 12), targetSdk 34.
+Next: build as libblender.so (NativeActivity) + APK packaging; strip binary.
