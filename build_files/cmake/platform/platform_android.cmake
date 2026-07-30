@@ -172,6 +172,14 @@ if(WITH_PYTHON)
   set(PYTHON_LIBRARY ${LIBDIR}/python/lib/libpython3.13.so)
   set(PYTHON_LIBPATH ${LIBDIR}/python/lib)
   find_package(PythonLibsUnix REQUIRED)
+  # Build-time scripts (discover_nodes.py, etc.) must run on the HOST, so
+  # PYTHON_EXECUTABLE points to a host interpreter, not the arm64 target one.
+  find_program(HOST_PYTHON_EXECUTABLE NAMES python3.13 python3 python
+    NO_CMAKE_FIND_ROOT_PATH)
+  if(NOT HOST_PYTHON_EXECUTABLE)
+    message(FATAL_ERROR "No host python3 found for build-time scripts")
+  endif()
+  set(PYTHON_EXECUTABLE "${HOST_PYTHON_EXECUTABLE}" CACHE FILEPATH "" FORCE)
 endif()
 
 find_package_wrapper(OpenEXR REQUIRED)
