@@ -430,14 +430,16 @@ struct GHOST_InstanceVK {
           !device_vk.features.features.geometryShader ||
 #endif
           !device_vk.features.features.vertexPipelineStoresAndAtomics ||
-          !device_vk.features.features.multiViewport ||
           !device_vk.features.features.shaderClipDistance ||
           !device_vk.features.features.fragmentStoresAndAtomics ||
           !device_vk.features.features.multiDrawIndirect ||
           !device_vk.features.features.imageCubeArray ||
-          !device_vk.features.features.dualSrcBlend || !device_vk.features.features.logicOp ||
+          !device_vk.features.features.dualSrcBlend ||
           !device_vk.features.features.imageCubeArray)
       {
+        /* multiViewport and logicOp are intentionally not required: they are
+         * unavailable on many mobile GPUs (all Adreno lack logicOp) and the
+         * Vulkan backend treats them as optional. */
         continue;
       }
 
@@ -605,10 +607,12 @@ struct GHOST_InstanceVK {
     device_features.geometryShader = VK_TRUE;
 #endif
     device_features.vertexPipelineStoresAndAtomics = VK_TRUE;
-    device_features.multiViewport = VK_TRUE;
+    /* Optional on mobile GPUs; only enable when supported (else vkCreateDevice
+     * fails with VK_ERROR_FEATURE_NOT_PRESENT). */
+    device_features.multiViewport = device.features.features.multiViewport;
     device_features.shaderClipDistance = VK_TRUE;
     device_features.fragmentStoresAndAtomics = VK_TRUE;
-    device_features.logicOp = VK_TRUE;
+    device_features.logicOp = device.features.features.logicOp;
     device_features.dualSrcBlend = VK_TRUE;
     device_features.imageCubeArray = VK_TRUE;
     device_features.multiDrawIndirect = VK_TRUE;
