@@ -29,6 +29,28 @@ ogg · vorbis · theora · opus · lame · aom · x265 · libvpx · x264 · **ff
   as IMPORTED executables from `CROSSCOMPILE_TOOLDIR/bin`. This is generic
   cross logic, not Apple-specific — adapt it for Android.
 
+### Build progress (cross-compile, fixed in order)
+1. ✅ Host codegen tools (WITH_CROSSCOMPILED_TOOLS, native build + import).
+2. ✅ Host/target feature-flag matching (android_features.cmake) — fixed RNA
+   generation mismatch (fluid getters).
+3. ✅ Cycles NEON via sse2neon (test_neon_support), not x86 -msse.
+4. ✅ Host python for build-time scripts (discover_nodes.py).
+5. ✅ GHOST headless VK ctor Android branch; USD libc++ (__gnu_cxx off).
+6. ✅ Vulkan-Headers 1.4.341 (NDK ships 275, too old).
+7. ✅ OpenSubdiv GLSL patch shader source header.
+
+### CURRENT BLOCKER — GPU subdivision is GL-coupled
+`intern/opensubdiv` GPU evaluator (gpu_compute_evaluator.cc, eval_output_gpu.h)
+unconditionally includes `epoxy/gl.h` and osd `glPatchTable.h`/`glVertexBuffer.h`
+— desktop GL. Android has no desktop GL, and osd's GL patch table can't build on
+GLES. The capi compiles GPU eval whenever WITH_VULKAN_BACKEND||WITH_OPENGL_BACKEND,
+but the impl is GL-only.
+FIX (non-stub): add a WITH_OPENSUBDIV_GPU-style gate so on Android the GPU
+evaluator sources + epoxy dep are excluded and the capi reports GPU subdiv
+unavailable; Blender already falls back to CPU subdiv
+(BKE_subsurf_modifier_can_do_gpu_subdiv → GPU_BACKEND_NONE path). Touches
+intern/opensubdiv (CMake + capi) and must stay desktop-safe.
+
 Then: link libblender.so, then OSL (host clang for bitcode), then APK.
 
 Old notes:
