@@ -23,8 +23,8 @@ export ANDROID_ABI="${ANDROID_ABI:-arm64-v8a}"
 # Minimum API we build against. 28 (Android 9) gives us modern Vulkan + a clean
 # NativeActivity/AInput surface while staying well below the tablet's OS level.
 export ANDROID_API="${ANDROID_API:-28}"
-# API we compile/target the app against (manifest targetSdkVersion).
-export ANDROID_TARGET_API="${ANDROID_TARGET_API:-35}"
+# API we compile/target the app against (manifest targetSdkVersion). Android 14.
+export ANDROID_TARGET_API="${ANDROID_TARGET_API:-34}"
 
 # --- Derived ----------------------------------------------------------------
 export ANDROID_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake"
