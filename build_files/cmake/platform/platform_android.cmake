@@ -154,6 +154,9 @@ set(WITH_PYTHON ON)
 set(WITH_PYTHON_INSTALL OFF)
 set(WITH_PYTHON_MODULE OFF)
 set(WITH_DOC_MANPAGE OFF)
+# Offline GLSL-as-C++ shader validation (dev feature); libc++ name clashes
+# (e.g. hypot). Runtime shaders still compile via shaderc.
+set(WITH_GPU_SHADER_CPP_COMPILATION OFF)
 set(WITH_CYCLES_HYDRA_RENDER_DELEGATE OFF)
 
 # Shared feature toggles (must match the host codegen-tools build exactly).
