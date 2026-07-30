@@ -8,10 +8,15 @@ Run: `build_files/android/deps/build.sh <dep>`. Installs into
 
 zlib · zstd · libdeflate · Imath · fmt · oneTBB · OpenEXR · libpng · pugixml ·
 libjpeg-turbo · brotli · freetype · harfbuzz · libwebp · libtiff · openjpeg ·
-expat · yaml-cpp · c-blosc · pystring · minizip-ng · OpenColorIO
+expat · yaml-cpp · c-blosc · pystring · minizip-ng · OpenColorIO ·
+OpenSubdiv (CPU) · robin-map · OpenImageIO
 
-OpenColorIO note: built with Python bindings off (Python not yet ported) and
-SSE off (arm64); re-enable OCIO_BUILD_PYTHON once Python lands.
+Notes:
+- OpenColorIO: Python bindings off (Python not yet ported), SSE off (arm64);
+  re-enable OCIO_BUILD_PYTHON once Python lands.
+- OpenSubdiv: CPU only; gated OPENGLES_FOUND behind NO_OPENGL.
+- OpenImageIO: Python/libheif/openjph/libraw/ffmpeg/OpenVDB/Qt/OpenGL off for
+  now; re-enable as those deps land. Ptex optional (not built).
 
 ## Cross-compile lessons baked into build.sh
 
@@ -24,13 +29,13 @@ SSE off (arm64); re-enable OCIO_BUILD_PYTHON once Python lands.
 
 ## Not done yet
 
-- **OpenSubdiv 3.7** — CMake `install()` bug under CMake 4 (`osd/CMakeLists.txt:431`,
-  "install FILES given no DESTINATION"). Needs a source patch.
-- **Hard tier (large, likely need patches):** Python, boost, LLVM (→ OSL),
-  OpenColorIO (needs pystring, minizip-ng), OpenImageIO, OpenVDB, MaterialX,
-  USD, Alembic, embree, ffmpeg, potrace, sqlite.
-- Blender cannot link/run until at least Python + the imaging/USD stack are up.
-  The remaining tier is genuinely multi-day.
+- **Hard tier (large, likely need patches):** Python, LLVM (→ OSL), OpenVDB
+  (needs boost), MaterialX, USD, Alembic, embree (needs ISPC), ffmpeg, potrace,
+  sqlite, openjph, libheif, Ptex.
+- Blender cannot link/run until at least Python + the remaining scene/render
+  stack are up. Python is the critical path.
+- Several built libs have optional features turned off pending their deps
+  (see Notes above) — revisit once Python/OpenVDB/etc. exist.
 
 ## Strategy for the hard tier (use the iOS branch as a blueprint)
 
