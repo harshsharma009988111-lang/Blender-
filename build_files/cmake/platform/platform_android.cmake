@@ -68,6 +68,26 @@ set(OpenSSL_ROOT ${LIBDIR}/openssl)
 set(WITH_VULKAN_BACKEND ON)
 set(WITH_GHOST_ANDROID ON)
 
+# -----------------------------------------------------------------------------
+# Cross-compiled build tools (makesdna, makesrna, datatoc, msgfmt, shader_tool).
+# These generate source at build time and must run on the host, so they are
+# built natively (macOS arm64 == Android arm64 data model, so DNA/RNA offsets
+# match) and imported here. Build them first:
+#   cmake -S . -B ../build_host_tools -G Ninja -DWITH_CYCLES=OFF
+#   ninja -C ../build_host_tools makesdna makesrna datatoc msgfmt shader_tool
+set(WITH_CROSSCOMPILED_TOOLS ON)
+if(NOT DEFINED CROSSCOMPILE_TOOLDIR)
+  set(CROSSCOMPILE_TOOLDIR "${CMAKE_SOURCE_DIR}/../build_host_tools/bin")
+endif()
+foreach(_tool makesdna makesrna datatoc msgfmt shader_tool)
+  if(NOT EXISTS "${CROSSCOMPILE_TOOLDIR}/${_tool}")
+    message(FATAL_ERROR "Host tool missing: ${CROSSCOMPILE_TOOLDIR}/${_tool}\n"
+      "Build host tools first (see platform_android.cmake header).")
+  endif()
+  add_executable(${_tool} IMPORTED GLOBAL)
+  set_property(TARGET ${_tool} PROPERTY IMPORTED_LOCATION "${CROSSCOMPILE_TOOLDIR}/${_tool}")
+endforeach()
+
 # Desktop-only or not-yet-ported features: keep off for Android.
 set(WITH_GHOST_X11 OFF)
 set(WITH_GHOST_WAYLAND OFF)

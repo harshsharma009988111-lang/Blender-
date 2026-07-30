@@ -48,8 +48,10 @@ if(WITH_GPU_SHADER_ASSERT)
   add_definitions(-DWITH_GPU_SHADER_ASSERT)
 endif()
 
-add_executable(shader_tool shader_tool.cc ${SRC})
-optimize_debug_target(shader_tool)
+if(NOT WITH_CROSSCOMPILED_TOOLS)
+  add_executable(shader_tool shader_tool.cc ${SRC})
+  optimize_debug_target(shader_tool)
+endif()
 
 if(WITH_GTESTS)
   set(TEST_SRC

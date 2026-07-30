@@ -30,10 +30,12 @@ if(WIN32)
   list(APPEND LIB bf_intern_utfconv)
 endif()
 
-add_executable(msgfmt ${SRC})
-setup_platform_linker_flags(msgfmt)
-blender_target_include_dirs(msgfmt ${INC})
-target_link_libraries(msgfmt ${LIB})
+if(NOT WITH_CROSSCOMPILED_TOOLS)
+  add_executable(msgfmt ${SRC})
+  setup_platform_linker_flags(msgfmt)
+  blender_target_include_dirs(msgfmt ${INC})
+  target_link_libraries(msgfmt ${LIB})
+endif()
 
 # If using an external manifest, copy it to the output directory after building.
 if(WITH_WINDOWS_EXTERNAL_MANIFEST)
