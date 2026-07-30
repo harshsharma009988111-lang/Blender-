@@ -18,6 +18,12 @@ if(NOT EXISTS "${LIBDIR}")
 endif()
 message(STATUS "Android LIBDIR = ${LIBDIR}")
 
+# pthread/rt are folded into bionic libc; empty stubs satisfy deps that still
+# emit -lpthread/-lrt (created by the deps builder in .stublibs).
+foreach(_lf CMAKE_EXE_LINKER_FLAGS CMAKE_SHARED_LINKER_FLAGS CMAKE_MODULE_LINKER_FLAGS)
+  string(APPEND ${_lf} " -L${LIBDIR}/.stublibs")
+endforeach()
+
 # NDK libc++ lacks std::atomic_ref (C++20); force-include a polyfill.
 string(APPEND CMAKE_CXX_FLAGS
   " -include ${CMAKE_SOURCE_DIR}/build_files/android/compat/atomic_ref_compat.hpp")
