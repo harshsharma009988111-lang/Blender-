@@ -51,6 +51,11 @@ class GHOST_SystemAndroid : public GHOST_System {
 
   uint16_t getDPIHint();
 
+  /* Soft keyboard, ready to wire once base GHOST gains the on-screen-keyboard
+   * hooks (as the iOS backend added). No JNI needed via NativeActivity. */
+  void showSoftKeyboard();
+  void hideSoftKeyboard();
+
   /* Called by the glue when Android (re)creates or destroys the surface. */
   void handleNativeWindowInit(android_app *app);
   void handleNativeWindowTerm();
@@ -72,7 +77,14 @@ class GHOST_SystemAndroid : public GHOST_System {
                               const bool is_dialog = false,
                               const GHOST_IWindow *parent_window = nullptr) override;
 
+  int32_t handleKeyEvent(AInputEvent *event);
+  int32_t handleMotionEvent(AInputEvent *event);
+
   android_app *app_;
   GHOST_WindowAndroid *window_;
   uint64_t start_time_;
+
+  /* Two-finger gesture tracking (pan/pinch), computed from raw pointers. */
+  bool gesture_active_;
+  float gesture_prev_x_, gesture_prev_y_, gesture_prev_dist_;
 };

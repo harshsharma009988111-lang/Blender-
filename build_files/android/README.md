@@ -52,8 +52,10 @@ This proves CMake → NDK → Ninja works before any dependency work.
 4. ✅ Invert the main loop: `android_main` (NativeActivity glue) runs init once
    then `WM_main_loop_body(C)` per frame. `WM_main` split into
    `WM_main_entry` + `WM_main_loop_body`; creator seam via `GHOST_android_launch`.
-5. 🚧 Input: `AMotionEvent`/gestures → GHOST events (basic down/up/move +
-   S Pen button → `GHOST_kButtonMaskRight` done; gestures/keyboard pending).
+5. ✅ Input: touch/stylus/keys → GHOST events. Single pointer → cursor+button;
+   two-finger → scroll+magnify trackpad; S Pen pressure/tilt → tablet data,
+   side button → right mouse; hardware keys mapped. Soft keyboard show/hide
+   ready (needs base GHOST on-screen-keyboard hooks to be called by the WM).
 6. ⬜ Port third-party dependencies for `android-arm64` (Python, LLVM, OIIO, TBB,
    USD, embree, OCIO, ffmpeg …). Largest remaining effort.
 7. ⬜ APK/AAB packaging (NativeActivity manifest) + `adb install` to the tablet.
