@@ -190,6 +190,7 @@ if(NOT TARGET OpenImageIO::oiiotool)
     IMPORTED_LOCATION "${LIBDIR}/openimageio/bin/oiiotool")
 endif()
 find_package_wrapper(OpenColorIO 2.0.0 REQUIRED)
+test_neon_support()  # sets SUPPORTS_NEON_BUILD, so Cycles uses sse2neon not -msse
 find_package_wrapper(sse2neon REQUIRED)
 find_package_wrapper(OpenVDB)
 find_package_wrapper(NanoVDB)
