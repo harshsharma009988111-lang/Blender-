@@ -327,6 +327,73 @@ int32_t GHOST_SystemAndroid::handleKeyEvent(AInputEvent *event)
   return 1;
 }
 
+/* Byte length of the UTF-8 character starting at a lead byte. */
+static int utf8_char_len(unsigned char lead)
+{
+  if (lead < 0x80) {
+    return 1;
+  }
+  if ((lead >> 5) == 0x6) {
+    return 2;
+  }
+  if ((lead >> 4) == 0xE) {
+    return 3;
+  }
+  if ((lead >> 3) == 0x1E) {
+    return 4;
+  }
+  return 1;
+}
+
+void GHOST_SystemAndroid::handleTextInput(const char *utf8_string)
+{
+  if (!window_ || !utf8_string) {
+    return;
+  }
+  for (const char *p = utf8_string; *p;) {
+    const int len = utf8_char_len((unsigned char)*p);
+    char buf[6] = {0};
+    for (int i = 0; i < len && p[i]; i++) {
+      buf[i] = p[i];
+    }
+    /* utf8_buf drives insertion; key only needs a valid keyboard type. */
+    const unsigned char c = (unsigned char)buf[0];
+    GHOST_TKey key = GHOST_kKeyA;
+    if (c == '\n' || c == '\r') {
+      key = GHOST_kKeyEnter;
+    }
+    else if (c >= 'a' && c <= 'z') {
+      key = GHOST_TKey(GHOST_kKeyA + (c - 'a'));
+    }
+    else if (c >= 'A' && c <= 'Z') {
+      key = GHOST_TKey(GHOST_kKeyA + (c - 'A'));
+    }
+    else if (c >= '0' && c <= '9') {
+      key = GHOST_TKey(GHOST_kKey0 + (c - '0'));
+    }
+    pushEvent(std::make_unique<GHOST_EventKey>(
+        getMilliSeconds(), GHOST_kEventKeyDown, window_, key, false, buf));
+    pushEvent(std::make_unique<GHOST_EventKey>(
+        getMilliSeconds(), GHOST_kEventKeyUp, window_, key, false));
+    p += len;
+  }
+}
+
+void GHOST_SystemAndroid::handleJavaKeyEvent(int32_t keycode, int32_t action, int32_t meta_state)
+{
+  if (!window_) {
+    return;
+  }
+  meta_state_ = meta_state;
+  const GHOST_TKey key = convertAndroidKey(keycode);
+  if (key == GHOST_kKeyUnknown) {
+    return;
+  }
+  const bool down = action == AKEY_EVENT_ACTION_DOWN;
+  pushEvent(std::make_unique<GHOST_EventKey>(
+      getMilliSeconds(), down ? GHOST_kEventKeyDown : GHOST_kEventKeyUp, window_, key, false));
+}
+
 GHOST_TSuccess GHOST_SystemAndroid::getModifierKeys(GHOST_ModifierKeys &keys) const
 {
   const bool shift = (meta_state_ & AMETA_SHIFT_ON) != 0;
@@ -475,20 +542,32 @@ uint16_t GHOST_SystemAndroid::getDPIHint()
   return 160;
 }
 
-GHOST_TSuccess GHOST_SystemAndroid::popupOnScreenKeyboard(GHOST_IWindow * /*window*/)
+/* Call a no-arg void method on the BlenderActivity instance. */
+static GHOST_TSuccess android_call_activity_void(android_app *app, const char *method)
 {
-  if (!app_ || !app_->activity) {
+  if (!app || !app->activity || !app->activity->clazz) {
     return GHOST_kFailure;
   }
-  ANativeActivity_showSoftInput(app_->activity, ANATIVEACTIVITY_SHOW_SOFT_INPUT_IMPLICIT);
+  JNIEnv *env = android_jni_env(app);
+  if (!env) {
+    return GHOST_kFailure;
+  }
+  jobject activity = app->activity->clazz;
+  jmethodID mid = env->GetMethodID(env->GetObjectClass(activity), method, "()V");
+  if (!mid) {
+    env->ExceptionClear();
+    return GHOST_kFailure;
+  }
+  env->CallVoidMethod(activity, mid);
   return GHOST_kSuccess;
+}
+
+GHOST_TSuccess GHOST_SystemAndroid::popupOnScreenKeyboard(GHOST_IWindow * /*window*/)
+{
+  return android_call_activity_void(app_, "showKeyboard");
 }
 
 GHOST_TSuccess GHOST_SystemAndroid::hideOnScreenKeyboard(GHOST_IWindow * /*window*/)
 {
-  if (!app_ || !app_->activity) {
-    return GHOST_kFailure;
-  }
-  ANativeActivity_hideSoftInput(app_->activity, ANATIVEACTIVITY_HIDE_SOFT_INPUT_IMPLICIT_ONLY);
-  return GHOST_kSuccess;
+  return android_call_activity_void(app_, "hideKeyboard");
 }

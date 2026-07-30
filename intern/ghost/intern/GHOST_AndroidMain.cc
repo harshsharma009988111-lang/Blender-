@@ -13,6 +13,7 @@
 #include "GHOST_SystemAndroid.hh"
 
 #include <android_native_app_glue.h>
+#include <jni.h>
 
 struct bContext;
 
@@ -67,6 +68,32 @@ static int32_t on_input_event(android_app * /*app*/, AInputEvent *event)
     return 0;
   }
   return android_system()->handleInputEvent(event);
+}
+
+static GHOST_SystemAndroid *android_system_if_ready()
+{
+  return GHOST_ISystem::getSystem() ? android_system() : nullptr;
+}
+
+/* Soft-keyboard text/keys from the Java InputConnection (BlenderActivity). */
+extern "C" JNIEXPORT void JNICALL Java_org_blender_blender_BlenderActivity_nativeOnCommitText(
+    JNIEnv *env, jobject /*thiz*/, jstring text)
+{
+  GHOST_SystemAndroid *system = android_system_if_ready();
+  if (!system || !text) {
+    return;
+  }
+  const char *utf = env->GetStringUTFChars(text, nullptr);
+  system->handleTextInput(utf);
+  env->ReleaseStringUTFChars(text, utf);
+}
+
+extern "C" JNIEXPORT void JNICALL Java_org_blender_blender_BlenderActivity_nativeOnKey(
+    JNIEnv * /*env*/, jobject /*thiz*/, jint keycode, jint action, jint meta_state)
+{
+  if (GHOST_SystemAndroid *system = android_system_if_ready()) {
+    system->handleJavaKeyEvent(keycode, action, meta_state);
+  }
 }
 
 extern "C" void android_main(struct android_app *app)

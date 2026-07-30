@@ -56,12 +56,15 @@ This proves CMake → NDK → Ninja works before any dependency work.
    two-finger → scroll+magnify trackpad; S Pen pressure/tilt → tablet data,
    side button → right mouse; hardware keys mapped. Soft keyboard is shown/hidden
    at text-edit begin/end via base GHOST `popupOnScreenKeyboard`/`hideOnScreenKeyboard`
-   hooks (no-op on desktop). Note: NativeActivity does not deliver typed soft-keyboard
-   text back — hardware keys work; on-screen typing needs JNI/GameTextInput later.
+   hooks (no-op on desktop). Soft-keyboard text is delivered via a Java
+   `BlenderActivity` (NativeActivity subclass) with a focusable proxy view whose
+   InputConnection forwards committed text/keys to native over JNI.
 5b. ✅ Backend stubs implemented: DPI from `AConfiguration`, modifier/button/cursor
    state from events, headless Vulkan offscreen context, `GHOST_SystemPathsAndroid`,
    clipboard via JNI `ClipboardManager`, surface-resize event on recreate.
-   App is landscape-only. Remaining deferral: soft-keyboard text delivery.
+   App is landscape-only. No backend stubs remain.
+   Note: `BlenderActivity.java` needs a Java build step in packaging (step 7);
+   soft-keyboard typing only activates once the app runs as that activity.
 6. ⬜ Port third-party dependencies for `android-arm64` (Python, LLVM, OIIO, TBB,
    USD, embree, OCIO, ffmpeg …). Largest remaining effort.
 7. ⬜ APK/AAB packaging (NativeActivity manifest) + `adb install` to the tablet.

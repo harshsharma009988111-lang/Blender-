@@ -65,6 +65,10 @@ class GHOST_SystemAndroid : public GHOST_System {
   /* Translate a native input event into GHOST events. Return 1 if handled. */
   int32_t handleInputEvent(AInputEvent *event);
 
+  /* Soft-keyboard input forwarded from the Java InputConnection bridge. */
+  void handleTextInput(const char *utf8_string);
+  void handleJavaKeyEvent(int32_t keycode, int32_t action, int32_t meta_state);
+
  private:
   GHOST_TSuccess init() override;
 
