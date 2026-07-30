@@ -140,14 +140,21 @@ extern "C" void android_main(struct android_app *app)
   while (!app->destroyRequested) {
     int events;
     android_poll_source *source;
-    /* Non-blocking once running so we render every frame; block while idle. */
-    const int timeout = g_context ? 0 : -1;
+    /* Block until the window exists (and Blender is launched); afterwards never
+     * block, so we fall through to render every frame. `GHOST_android_launch`
+     * runs the whole init inside `source->process` and sets `g_context`
+     * mid-drain, so the timeout must be re-evaluated after each event rather
+     * than captured once — otherwise the loop blocks forever and never renders. */
+    int timeout = g_context ? 0 : -1;
     while (ALooper_pollOnce(timeout, nullptr, &events, (void **)&source) >= 0) {
       if (source) {
         source->process(app, source);
       }
       if (app->destroyRequested) {
         return;
+      }
+      if (g_context) {
+        timeout = 0;
       }
     }
 
