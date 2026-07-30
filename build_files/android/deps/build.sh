@@ -352,6 +352,26 @@ build_sqlite() {
     --enable-rtree --enable-fts4 --enable-fts5 --enable-threadsafe
 }
 
+build_libffi() {
+  local v; v="$(dep_version FFI_VERSION)"
+  fetch "libffi-$v.tar.gz" "https://github.com/libffi/libffi/releases/download/v$v/libffi-$v.tar.gz"
+  local src; src="$(extract "libffi-$v.tar.gz" libffi)"
+  autotools_install "$src" libffi --disable-static --enable-shared --disable-docs
+}
+
+build_openssl() {
+  local v; v="$(dep_version SSL_VERSION)"
+  fetch "openssl-$v.tar.gz" "https://github.com/openssl/openssl/releases/download/openssl-$v/openssl-$v.tar.gz"
+  local src; src="$(extract "openssl-$v.tar.gz" openssl)"
+  # OpenSSL has native Android targets; it reads ANDROID_NDK_ROOT + PATH.
+  export ANDROID_NDK_ROOT PATH="$ANDROID_LLVM_BIN:$PATH"
+  ( cd "$src" &&
+    ./Configure android-arm64 -D__ANDROID_API__="$ANDROID_API" \
+      no-tests no-apps shared --prefix="$LIBDIR/openssl" --libdir=lib &&
+    make -j"$(sysctl -n hw.ncpu)" && make install_sw )
+  echo "[deps] installed openssl -> $LIBDIR/openssl"
+}
+
 build_materialx() {
   local v; v="$(dep_version MATERIALX_VERSION)"
   fetch "materialx-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/MaterialX/archive/refs/tags/v$v.tar.gz"
