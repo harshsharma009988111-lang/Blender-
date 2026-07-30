@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Blender Authors
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Cross-compile Blender's third-party dependencies for Android with the NDK.
+# Each dependency installs into a harvest prefix ($LIBDIR/<name>), mirroring
+# the layout of the prebuilt lib/<platform> submodules.
+#
+# Usage:
+#   build_files/android/deps/build.sh <dep> [<dep> ...]
+#   build_files/android/deps/build.sh all
+#
+# Versions are read from build_files/build_environment/cmake/versions.cmake.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+# shellcheck source=/dev/null
+source "$REPO_ROOT/build_files/android/env.sh"
+
+: "${LIBDIR:=$REPO_ROOT/../lib/android_$( [ "$ANDROID_ABI" = arm64-v8a ] && echo arm64 || echo "$ANDROID_ABI")}"
+DL_DIR="$REPO_ROOT/../android_deps_build/downloads"
+WORK_DIR="$REPO_ROOT/../android_deps_build/work"
+VERSIONS="$REPO_ROOT/build_files/build_environment/cmake/versions.cmake"
+mkdir -p "$LIBDIR" "$DL_DIR" "$WORK_DIR"
+
+echo "[deps] LIBDIR=$LIBDIR"
+
+# Read a `set(NAME value)` entry from versions.cmake.
+dep_version() {
+  sed -nE "s/^set\($1 ([^ )]+)\).*/\1/p" "$VERSIONS" | head -1
+}
+
+# Download $2 to $DL_DIR/$1 if missing.
+fetch() {
+  local file="$1" url="$2"
+  if [ ! -f "$DL_DIR/$file" ]; then
+    echo "[deps] fetching $file"
+    curl -sL --max-time 300 -o "$DL_DIR/$file" "$url"
+  fi
+}
+
+# Extract a tarball into $WORK_DIR and echo the resulting source dir.
+extract() {
+  local file="$1" name="$2"
+  local dir="$WORK_DIR/$name"
+  rm -rf "$dir"
+  mkdir -p "$dir"
+  tar -xf "$DL_DIR/$file" -C "$dir" --strip-components=1
+  echo "$dir"
+}
+
+# Configure/build/install a CMake-based dependency for Android.
+# $1 src dir, $2 install name, rest: extra cmake args.
+cmake_install() {
+  local src="$1" name="$2"; shift 2
+  local build="$src/build-android"
+  cmake -S "$src" -B "$build" -G Ninja \
+    -DCMAKE_TOOLCHAIN_FILE="$ANDROID_TOOLCHAIN_FILE" \
+    -DANDROID_ABI="$ANDROID_ABI" \
+    -DANDROID_PLATFORM="android-$ANDROID_API" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX="$LIBDIR/$name" \
+    -DBUILD_TESTING=OFF \
+    "$@"
+  cmake --build "$build"
+  cmake --install "$build"
+  echo "[deps] installed $name -> $LIBDIR/$name"
+}
+
+build_zlib() {
+  local v; v="$(dep_version ZLIB_VERSION)"
+  fetch "zlib-$v.tar.gz" "https://github.com/madler/zlib/releases/download/v$v/zlib-$v.tar.gz"
+  local src; src="$(extract "zlib-$v.tar.gz" zlib)"
+  cmake_install "$src" zlib -DZLIB_BUILD_EXAMPLES=OFF
+}
+
+main() {
+  [ $# -gt 0 ] || { echo "usage: $0 <dep> [dep...] | all" >&2; exit 1; }
+  local targets=("$@")
+  if [ "${1:-}" = all ]; then
+    targets=(zlib)
+  fi
+  for t in "${targets[@]}"; do
+    echo "=== building: $t ==="
+    "build_$t"
+  done
+}
+
+main "$@"
