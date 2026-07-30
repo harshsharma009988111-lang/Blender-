@@ -174,6 +174,7 @@ elseif(APPLE AND NOT WITH_GHOST_X11)
 
 elseif(WITH_GHOST_ANDROID)
   list(APPEND SRC
+    intern/GHOST_AndroidMain.cc
     intern/GHOST_SystemAndroid.cc
     intern/GHOST_WindowAndroid.cc
 

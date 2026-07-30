@@ -49,7 +49,9 @@ This proves CMake → NDK → Ninja works before any dependency work.
    `ANativeWindow*`).
 3. ✅ Scaffold `GHOST_SystemAndroid` / `GHOST_WindowAndroid` + the `ANDROID`
    branch in `intern/ghost/CMakeLists.txt` (gated by `WITH_GHOST_ANDROID`).
-4. ⬜ Invert the main loop: Choreographer vsync → `WM_main_loop_body(C)`.
+4. ✅ Invert the main loop: `android_main` (NativeActivity glue) runs init once
+   then `WM_main_loop_body(C)` per frame. `WM_main` split into
+   `WM_main_entry` + `WM_main_loop_body`; creator seam via `GHOST_android_launch`.
 5. 🚧 Input: `AMotionEvent`/gestures → GHOST events (basic down/up/move +
    S Pen button → `GHOST_kButtonMaskRight` done; gestures/keyboard pending).
 6. ⬜ Port third-party dependencies for `android-arm64` (Python, LLVM, OIIO, TBB,
