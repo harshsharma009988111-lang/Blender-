@@ -120,9 +120,11 @@ cp "$STAGE/base.apk" "$OUT"
 
 echo "[apk] signing"
 KS="$REPO_ROOT/../android-debug.keystore"  # persistent: stable signature across runs
-"$JAVA_HOME/bin/keytool" -genkeypair -keystore "$KS" -storepass android \
-  -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
-  -dname "CN=Android Debug,O=Android,C=US" >/dev/null 2>&1
+if [ ! -f "$KS" ]; then
+  "$JAVA_HOME/bin/keytool" -genkeypair -keystore "$KS" -storepass android \
+    -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+    -dname "CN=Android Debug,O=Android,C=US" >/dev/null 2>&1
+fi
 "$BT/zipalign" -f -p 4 "$OUT" "$STAGE/blender-aligned.apk"
 mv "$STAGE/blender-aligned.apk" "$OUT"
 "$BT/apksigner" sign --ks "$KS" --ks-pass pass:android --key-pass pass:android "$OUT"
