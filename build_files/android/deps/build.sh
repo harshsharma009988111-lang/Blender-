@@ -112,6 +112,20 @@ build_fmt() {
   cmake_install "$src" fmt -DFMT_TEST=OFF -DFMT_DOC=OFF -DBUILD_SHARED_LIBS=OFF
 }
 
+build_tbb() {
+  local v; v="$(dep_version TBB_VERSION)"  # e.g. v2022.3.0
+  fetch "onetbb-$v.tar.gz" "https://github.com/uxlfoundation/oneTBB/archive/refs/tags/$v.tar.gz"
+  local src; src="$(extract "onetbb-$v.tar.gz" tbb)"
+  # NDK sets --no-undefined-version; oneTBB def files list symbols not built,
+  # so allow undefined version-script symbols.
+  cmake_install "$src" tbb \
+    -DTBB_TEST=OFF \
+    -DTBB_STRICT=OFF \
+    -DTBB_INSTALL=ON \
+    -DBUILD_SHARED_LIBS=ON \
+    -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--undefined-version"
+}
+
 main() {
   [ $# -gt 0 ] || { echo "usage: $0 <dep> [dep...] | all" >&2; exit 1; }
   local targets=("$@")
