@@ -306,8 +306,11 @@ build_opensubdiv() {
   sed -i '' 's/if(OPENGLES_FOUND)/if(OPENGLES_FOUND AND NOT NO_OPENGL)/' \
     "$src/CMakeLists.txt"
   # Its ANDROID block installs Android.mk to LIBRARY_OUTPUT_PATH_ROOT; set it.
+  # Blender's GPU subdiv needs glslPatchShaderSource (a source-string
+  # generator, no GL context); enable it without a GL loader.
   cmake_install "$src" opensubdiv \
     -DTBB_ROOT="$LIBDIR/tbb" \
+    -DOSD_PATCH_SHADER_SOURCE_GLSL=ON \
     -DLIBRARY_OUTPUT_PATH_ROOT="$LIBDIR/opensubdiv" \
     -DNO_TUTORIALS=ON -DNO_EXAMPLES=ON -DNO_REGRESSION=ON -DNO_DOC=ON \
     -DNO_OMP=ON -DNO_CUDA=ON -DNO_OPENCL=ON -DNO_METAL=ON -DNO_DX=ON \
