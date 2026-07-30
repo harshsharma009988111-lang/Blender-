@@ -85,7 +85,7 @@ harfbuzz webp tiff openjpeg expat yamlcpp blosc pystring minizipng opencolorio
 opensubdiv robinmap openimageio embree alembic materialx potrace sqlite
 libffi openssl python openvdb ogg vorbis theora opus lame aom x265 vpx x264
 ffmpeg lzma bzip2 xml2 eigen sse2neon fribidi abseil vulkan_headers meshoptimizer
-shaderc numpy usd llvm
+shaderc numpy usd llvm rubberband
 ```
 
 Each installs to `../lib/android_arm64/<name>`; verify with:

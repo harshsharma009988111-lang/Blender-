@@ -30,9 +30,6 @@ set(WITH_MANIFOLD OFF CACHE BOOL "" FORCE)
 set(WITH_VECTOR_GRAPHICS OFF CACHE BOOL "" FORCE)
 set(WITH_OPENCOLLADA OFF CACHE BOOL "" FORCE)
 set(WITH_TRACY OFF CACHE BOOL "" FORCE)
-# Rubberband (audaspace audio time-stretch) not cross-compiled for Android yet;
-# leaving it on makes sound.cc reference symbols audaspace never builds.
-set(WITH_RUBBERBAND OFF CACHE BOOL "" FORCE)
 set(WITH_CYCLES_OSL OFF CACHE BOOL "" FORCE)
 set(WITH_CYCLES_PATH_GUIDING OFF CACHE BOOL "" FORCE)
 set(WITH_CYCLES_DEVICE_CUDA OFF CACHE BOOL "" FORCE)

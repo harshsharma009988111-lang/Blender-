@@ -242,3 +242,8 @@ endif()
 if(WITH_CODEC_FFMPEG)
   find_package(FFmpeg)
 endif()
+
+if(WITH_RUBBERBAND)
+  set(RUBBERBAND_ROOT_DIR ${LIBDIR}/rubberband)
+  find_package(Rubberband REQUIRED)
+endif()

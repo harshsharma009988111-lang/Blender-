@@ -637,6 +637,35 @@ build_eigen() {
   cmake_install "$src" eigen -DEIGEN_BUILD_DOC=OFF -DBUILD_TESTING=OFF
 }
 
+build_rubberband() {
+  local v; v="$(dep_version RUBBERBAND_VERSION)"
+  fetch "rubberband-$v.tar.bz2" \
+    "https://breakfastquay.com/files/releases/rubberband-$v.tar.bz2"
+  local src; src="$(extract "rubberband-$v.tar.bz2" rubberband)"
+  patch -p1 -d "$src" \
+    < "$REPO_ROOT/build_files/build_environment/patches/rubberband_missing_cstdlib.diff"
+  # meson build; bundled kissfft + builtin resampler avoid the fftw dep (off on
+  # Android). auto_features=disabled drops cmdline/vamp/ladspa/lv2/jni.
+  local cross="$WORK_DIR/rubberband-cross.ini"
+  cat >"$cross" <<EOF
+[binaries]
+c = '$ANDROID_LLVM_BIN/aarch64-linux-android${ANDROID_API}-clang'
+cpp = '$ANDROID_LLVM_BIN/aarch64-linux-android${ANDROID_API}-clang++'
+ar = '$ANDROID_LLVM_BIN/llvm-ar'
+strip = '$ANDROID_LLVM_BIN/llvm-strip'
+[host_machine]
+system = 'android'
+cpu_family = 'aarch64'
+cpu = 'aarch64'
+endian = 'little'
+EOF
+  ( cd "$src" && meson setup build-android --cross-file "$cross" \
+      --prefix="$LIBDIR/rubberband" --libdir lib --default-library=shared \
+      -Dauto_features=disabled -Dfft=kissfft -Dresampler=builtin &&
+    ninja -C build-android && ninja -C build-android install )
+  echo "[deps] installed rubberband -> $LIBDIR/rubberband"
+}
+
 build_sse2neon() {
   local v; v="$(dep_version SSE2NEON_VERSION)"
   fetch "sse2neon-$v.tar.gz" "https://github.com/DLTcollab/sse2neon/archive/$v.tar.gz"
