@@ -320,6 +320,38 @@ build_openimageio() {
     -DRobinmap_ROOT="$LIBDIR/robinmap"
 }
 
+# Configure/build/install an autotools dependency for Android via the NDK.
+# $1 src dir, $2 install name, rest: extra ./configure args.
+autotools_install() {
+  local src="$1" name="$2"; shift 2
+  local host=aarch64-linux-android
+  export CC="$ANDROID_LLVM_BIN/${host}${ANDROID_API}-clang"
+  export CXX="$ANDROID_LLVM_BIN/${host}${ANDROID_API}-clang++"
+  export AR="$ANDROID_LLVM_BIN/llvm-ar" RANLIB="$ANDROID_LLVM_BIN/llvm-ranlib"
+  export STRIP="$ANDROID_LLVM_BIN/llvm-strip"
+  export CFLAGS="-fPIC -O2 -I$LIBDIR/zlib/include" LDFLAGS="-L$LIBDIR/zlib/lib"
+  ( cd "$src" && ./configure --host="$host" --prefix="$LIBDIR/$name" "$@" &&
+    make -j"$(sysctl -n hw.ncpu)" && make install )
+  unset CC CXX AR RANLIB STRIP CFLAGS LDFLAGS
+  echo "[deps] installed $name -> $LIBDIR/$name"
+}
+
+build_potrace() {
+  local v; v="$(dep_version POTRACE_VERSION)"
+  fetch "potrace-$v.tar.gz" "https://potrace.sourceforge.net/download/$v/potrace-$v.tar.gz"
+  local src; src="$(extract "potrace-$v.tar.gz" potrace)"
+  autotools_install "$src" potrace --with-libpotrace --disable-static --enable-shared
+}
+
+build_sqlite() {
+  local v; v="$(dep_version SQLITE_VERSION)"
+  local lv; lv="$(sed -nE 's/^set\(SQLLITE_LONG_VERSION ([0-9]+)\).*/\1/p' "$VERSIONS")"
+  fetch "sqlite-$v.tar.gz" "https://www.sqlite.org/2025/sqlite-autoconf-$lv.tar.gz"
+  local src; src="$(extract "sqlite-$v.tar.gz" sqlite)"
+  autotools_install "$src" sqlite \
+    --enable-rtree --enable-fts4 --enable-fts5 --enable-threadsafe
+}
+
 build_materialx() {
   local v; v="$(dep_version MATERIALX_VERSION)"
   fetch "materialx-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/MaterialX/archive/refs/tags/v$v.tar.gz"
