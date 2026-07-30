@@ -320,6 +320,31 @@ build_openimageio() {
     -DRobinmap_ROOT="$LIBDIR/robinmap"
 }
 
+build_embree() {
+  local v; v="$(dep_version EMBREE_VERSION)"
+  fetch "embree-$v.zip" "https://github.com/RenderKit/embree/archive/v$v.zip"
+  local dir="$WORK_DIR/embree"; rm -rf "$dir"; mkdir -p "$dir"
+  ( cd "$dir" && unzip -q "$DL_DIR/embree-$v.zip" && mv embree-*/* . )
+  cmake_install "$dir" embree \
+    -DTBB_ROOT="$LIBDIR/tbb" \
+    -DTBB_DIR="$LIBDIR/tbb/lib/cmake/TBB" \
+    -DEMBREE_TBB_ROOT="$LIBDIR/tbb" \
+    -DEMBREE_TASKING_SYSTEM=TBB \
+    -DEMBREE_ISPC_SUPPORT=OFF \
+    -DEMBREE_TUTORIALS=OFF \
+    -DEMBREE_STATIC_LIB=OFF \
+    -DEMBREE_MAX_ISA=NEON
+}
+
+build_alembic() {
+  local v; v="$(dep_version ALEMBIC_VERSION)"
+  fetch "alembic-$v.tar.gz" "https://github.com/alembic/alembic/archive/$v.tar.gz"
+  local src; src="$(extract "alembic-$v.tar.gz" alembic)"
+  cmake_install "$src" alembic \
+    -DUSE_HDF5=OFF -DUSE_TESTS=OFF -DUSE_BINARIES=OFF \
+    -DALEMBIC_SHARED_LIBS=ON -DALEMBIC_ILMBASE_LINK_STATIC=OFF
+}
+
 build_openexr() {
   local v; v="$(dep_version OPENEXR_VERSION)"
   fetch "openexr-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/openexr/archive/v$v.tar.gz"
