@@ -320,6 +320,20 @@ build_openimageio() {
     -DRobinmap_ROOT="$LIBDIR/robinmap"
 }
 
+build_materialx() {
+  local v; v="$(dep_version MATERIALX_VERSION)"
+  fetch "materialx-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/MaterialX/archive/refs/tags/v$v.tar.gz"
+  local src; src="$(extract "materialx-$v.tar.gz" materialx)"
+  cmake_install "$src" materialx \
+    -DMATERIALX_BUILD_SHARED_LIBS=ON \
+    -DMATERIALX_BUILD_PYTHON=OFF \
+    -DMATERIALX_BUILD_TESTS=OFF \
+    -DMATERIALX_BUILD_VIEWER=OFF \
+    -DMATERIALX_BUILD_GRAPH_EDITOR=OFF \
+    -DMATERIALX_BUILD_RENDER=OFF \
+    -DMATERIALX_INSTALL_RESOURCES=OFF
+}
+
 build_embree() {
   local v; v="$(dep_version EMBREE_VERSION)"
   fetch "embree-$v.zip" "https://github.com/RenderKit/embree/archive/v$v.zip"
