@@ -346,7 +346,7 @@ build_potrace() {
 build_sqlite() {
   local v; v="$(dep_version SQLITE_VERSION)"
   local lv; lv="$(sed -nE 's/^set\(SQLLITE_LONG_VERSION ([0-9]+)\).*/\1/p' "$VERSIONS")"
-  fetch "sqlite-$v.tar.gz" "https://www.sqlite.org/2025/sqlite-autoconf-$lv.tar.gz"
+  fetch "sqlite-$v.tar.gz" "https://www.sqlite.org/2026/sqlite-autoconf-$lv.tar.gz"
   local src; src="$(extract "sqlite-$v.tar.gz" sqlite)"
   autotools_install "$src" sqlite \
     --enable-rtree --enable-fts4 --enable-fts5 --enable-threadsafe
