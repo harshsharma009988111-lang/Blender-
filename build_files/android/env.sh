@@ -20,9 +20,9 @@ export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Con
 # --- Target: Samsung Galaxy Tab S8 FE ---------------------------------------
 # SoC: Exynos 1380 (arm64). Vulkan 1.1+. Ships Android 12, updatable to 14/15.
 export ANDROID_ABI="${ANDROID_ABI:-arm64-v8a}"
-# Minimum API we build against. 28 (Android 9) gives us modern Vulkan + a clean
-# NativeActivity/AInput surface while staying well below the tablet's OS level.
-export ANDROID_API="${ANDROID_API:-28}"
+# Minimum API we build against. 31 (Android 12) is both target devices' launch
+# API and provides bionic funcs (timespec_get@29 etc.) Blender core expects.
+export ANDROID_API="${ANDROID_API:-31}"
 # API we compile/target the app against (manifest targetSdkVersion). Android 14.
 export ANDROID_TARGET_API="${ANDROID_TARGET_API:-34}"
 
