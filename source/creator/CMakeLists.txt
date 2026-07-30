@@ -339,6 +339,9 @@ elseif(ANDROID)
   # ANativeActivity_onCreate). Build a shared library rather than an executable.
   add_library(blender SHARED ${SRC})
   set_target_properties(blender PROPERTIES OUTPUT_NAME blender)
+  # Force-keep the glue entry point (only the Android runtime references it),
+  # which pulls in android_main and the JNI bridge from bf_intern_ghost.
+  target_link_options(blender PRIVATE -Wl,-u,ANativeActivity_onCreate)
 else()
   add_executable(blender ${EXETYPE} ${SRC})
   if(WITH_CPU_CHECK)

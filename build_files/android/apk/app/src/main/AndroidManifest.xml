@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Blender Authors
+     SPDX-License-Identifier: GPL-2.0-or-later -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.blender.blender">
+
+    <uses-feature android:name="android.hardware.vulkan.version"
+        android:version="0x400003" android:required="true" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
+    <application
+        android:label="Blender"
+        android:hasCode="true"
+        android:allowBackup="true"
+        android:extractNativeLibs="true"
+        android:debuggable="true">
+
+        <!-- BlenderActivity extends NativeActivity; loads libblender.so and
+             bridges soft-keyboard IME text to native. Landscape only. -->
+        <activity
+            android:name="org.blender.blender.BlenderActivity"
+            android:label="Blender"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|screenLayout|density|navigation|uiMode"
+            android:exported="true">
+            <meta-data android:name="android.app.lib_name" android:value="blender" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

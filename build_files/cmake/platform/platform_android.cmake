@@ -85,6 +85,8 @@ set(OpenSSL_ROOT ${LIBDIR}/openssl)
 # Vulkan surface from the NDK sysroot.
 set(WITH_VULKAN_BACKEND ON)
 set(WITH_GHOST_ANDROID ON)
+# Global so creator.cc (GHOST_android_launch) and the GHOST backend agree.
+add_definitions(-DWITH_GHOST_ANDROID)
 # volk must load the Android surface entrypoint (vkCreateAndroidSurfaceKHR).
 add_definitions(-DVK_USE_PLATFORM_ANDROID_KHR)
 
