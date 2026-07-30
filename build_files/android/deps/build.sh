@@ -329,7 +329,8 @@ autotools_install() {
   export CXX="$ANDROID_LLVM_BIN/${host}${ANDROID_API}-clang++"
   export AR="$ANDROID_LLVM_BIN/llvm-ar" RANLIB="$ANDROID_LLVM_BIN/llvm-ranlib"
   export STRIP="$ANDROID_LLVM_BIN/llvm-strip"
-  export CFLAGS="-fPIC -O2 -I$LIBDIR/zlib/include" LDFLAGS="-L$LIBDIR/zlib/lib"
+  export CFLAGS="-fPIC -O2 -I$LIBDIR/zlib/include"
+  export LDFLAGS="-L$LIBDIR/zlib/lib ${EXTRA_LDFLAGS:-}"
   ( cd "$src" && ./configure --host="$host" --prefix="$LIBDIR/$name" "$@" &&
     make -j"$(sysctl -n hw.ncpu)" && make install )
   unset CC CXX AR RANLIB STRIP CFLAGS LDFLAGS
@@ -425,6 +426,47 @@ build_openvdb() {
     -DOPENVDB_BUILD_NANOVDB=ON -DNANOVDB_BUILD_TOOLS=OFF -DUSE_NANOVDB=ON \
     -DOPENVDB_BUILD_PYTHON_MODULE=OFF \
     -DUSE_BLOSC=ON -DBlosc_ROOT="$LIBDIR/blosc" -DTBB_ROOT="$LIBDIR/tbb"
+}
+
+build_ogg() {
+  local v; v="$(dep_version OGG_VERSION)"
+  fetch "libogg-$v.tar.gz" "https://downloads.xiph.org/releases/ogg/libogg-$v.tar.gz"
+  local src; src="$(extract "libogg-$v.tar.gz" ogg)"
+  autotools_install "$src" ogg --disable-static --enable-shared
+}
+
+build_vorbis() {
+  local v; v="$(dep_version VORBIS_VERSION)"
+  fetch "libvorbis-$v.tar.gz" "https://downloads.xiph.org/releases/vorbis/libvorbis-$v.tar.gz"
+  local src; src="$(extract "libvorbis-$v.tar.gz" vorbis)"
+  autotools_install "$src" vorbis --disable-static --enable-shared --with-ogg="$LIBDIR/ogg"
+}
+
+build_theora() {
+  local v; v="$(dep_version THEORA_VERSION)"
+  fetch "libtheora-$v.tar.bz2" "https://downloads.xiph.org/releases/theora/libtheora-$v.tar.bz2"
+  local src; src="$(extract "libtheora-$v.tar.bz2" theora)"
+  # theora 1.1.1 ships a 2009 config.sub with no aarch64; refresh from opus.
+  cp "$WORK_DIR/opus/config.sub" "$WORK_DIR/opus/config.guess" "$src/" 2>/dev/null || true
+  autotools_install "$src" theora --disable-static --enable-shared \
+    --with-ogg="$LIBDIR/ogg" --with-vorbis="$LIBDIR/vorbis" \
+    --disable-examples --disable-oggtest --disable-vorbistest
+}
+
+build_opus() {
+  local v; v="$(dep_version OPUS_VERSION)"
+  fetch "opus-$v.tar.gz" "https://archive.mozilla.org/pub/opus/opus-$v.tar.gz"
+  local src; src="$(extract "opus-$v.tar.gz" opus)"
+  autotools_install "$src" opus --disable-static --enable-shared --disable-doc --disable-extra-programs
+}
+
+build_lame() {
+  local v; v="$(dep_version LAME_VERSION)"
+  fetch "lame-$v.tar.gz" "https://downloads.sourceforge.net/project/lame/lame/$v/lame-$v.tar.gz"
+  local src; src="$(extract "lame-$v.tar.gz" lame)"
+  # lame's symbol map lists lame_init_old which isn't built; allow it.
+  EXTRA_LDFLAGS="-Wl,--undefined-version" \
+    autotools_install "$src" lame --disable-static --enable-shared --disable-frontend
 }
 
 build_materialx() {
