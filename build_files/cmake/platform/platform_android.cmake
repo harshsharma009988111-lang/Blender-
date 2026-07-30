@@ -85,6 +85,8 @@ set(OpenSSL_ROOT ${LIBDIR}/openssl)
 # Vulkan surface from the NDK sysroot.
 set(WITH_VULKAN_BACKEND ON)
 set(WITH_GHOST_ANDROID ON)
+# volk must load the Android surface entrypoint (vkCreateAndroidSurfaceKHR).
+add_definitions(-DVK_USE_PLATFORM_ANDROID_KHR)
 
 # -----------------------------------------------------------------------------
 # Cross-compiled build tools (makesdna, makesrna, datatoc, msgfmt, shader_tool).
@@ -216,9 +218,8 @@ find_package_wrapper(OpenJPEG)
 find_package_wrapper(WebP)
 find_package_wrapper(PugiXML)
 find_package_wrapper(TBB)
-if(NOT TBB_LIBRARIES)
-  set(TBB_LIBRARIES TBB::tbb)
-endif()
+# Blender uses tbbmalloc's scalable_allocation_mode, so link it too.
+set(TBB_LIBRARIES TBB::tbb TBB::tbbmalloc)
 find_package_wrapper(OpenImageIO REQUIRED)
 # OIIO built without tools; stub the tool target (not executed in this config).
 if(NOT TARGET OpenImageIO::oiiotool)
