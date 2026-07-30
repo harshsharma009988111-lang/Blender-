@@ -10,7 +10,10 @@ zlib · zstd · libdeflate · Imath · fmt · oneTBB · OpenEXR · libpng · pug
 libjpeg-turbo · brotli · freetype · harfbuzz · libwebp · libtiff · openjpeg ·
 expat · yaml-cpp · c-blosc · pystring · minizip-ng · OpenColorIO ·
 OpenSubdiv (CPU) · robin-map · OpenImageIO · embree · Alembic · MaterialX ·
-potrace · sqlite
+potrace · sqlite · libffi · OpenSSL · **Python 3.13** · OpenVDB(+NanoVDB) ·
+ogg · vorbis · theora · opus · lame · aom · x265 · libvpx · x264 · **ffmpeg**
+
+In progress (background builds): LLVM (+clang, host tblgen then cross), USD.
 
 Notes:
 - OpenColorIO: Python bindings off (Python not yet ported), SSE off (arm64);
@@ -20,6 +23,14 @@ Notes:
   now; re-enable as those deps land. Ptex optional (not built).
 - embree: NEON ISA, TBB tasking, ISPC off. Alembic: HDF5 off. MaterialX:
   core/codegen only (render off, needs X11). potrace/sqlite via autotools.
+- Python: two-stage (host 3.13 → NDK cross); _ctypes/_ssl/_sqlite3/zlib built.
+- OpenVDB: DELAYED_LOADING off (drops Boost), NanoVDB on, python module off.
+- ffmpeg: --enable-gpl, all codecs. vpx static (target rejects shared).
+  x265 asm off (bad -mcpu). pthread/rt stub libs for Android libc.
+- LLVM: targets AArch64;ARM;NVPTX + clang; needs host tblgen first.
+- USD: monolithic, GL/OSL/Python-bindings off for now, noboost patch,
+  imaging + MaterialX + OpenVDB + OIIO plugin on.
+- Host tooling installed: pkgconf (ffmpeg/USD need it).
 
 ## Cross-compile lessons baked into build.sh
 

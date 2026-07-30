@@ -571,6 +571,54 @@ build_ffmpeg() {
   echo "[deps] installed ffmpeg -> $LIBDIR/ffmpeg"
 }
 
+build_llvm() {
+  local v; v="$(dep_version LLVM_VERSION)"
+  fetch "llvm-project-$v.src.tar.xz" \
+    "https://github.com/llvm/llvm-project/releases/download/llvmorg-$v/llvm-project-$v.src.tar.xz"
+  local src; src="$(extract "llvm-project-$v.src.tar.xz" llvm)"
+
+  # Stage 1: host tablegen tools (needed to cross-build LLVM/clang).
+  local host_build="$src/build-host"
+  if [ ! -x "$host_build/bin/llvm-tblgen" ]; then
+    cmake -S "$src/llvm" -B "$host_build" -G Ninja \
+      -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_PROJECTS=clang \
+      -DLLVM_TARGETS_TO_BUILD=AArch64
+    cmake --build "$host_build" --target llvm-tblgen clang-tblgen
+  fi
+
+  # Stage 2: cross-compile LLVM + clang for Android.
+  cmake_install "$src/llvm" llvm \
+    -DLLVM_TABLEGEN="$host_build/bin/llvm-tblgen" \
+    -DCLANG_TABLEGEN="$host_build/bin/clang-tblgen" \
+    -DLLVM_ENABLE_PROJECTS=clang \
+    -DLLVM_TARGETS_TO_BUILD="AArch64;ARM;NVPTX" \
+    -DLLVM_HOST_TRIPLE=aarch64-linux-android \
+    -DLLVM_DEFAULT_TARGET_TRIPLE=aarch64-linux-android \
+    -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF \
+    -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_ZSTD=OFF \
+    -DLLVM_ENABLE_LIBXML2=OFF -DLLVM_ENABLE_UNWIND_TABLES=OFF \
+    -DLLVM_ENABLE_PIC=ON -DLLVM_BUILD_TOOLS=OFF -DLLVM_ENABLE_RTTI=ON
+}
+
+build_usd() {
+  local v; v="$(dep_version USD_VERSION)"
+  fetch "openusd-$v.tar.gz" "https://github.com/PixarAnimationStudios/OpenUSD/archive/v$v.tar.gz"
+  local src; src="$(extract "openusd-$v.tar.gz" usd)"
+  # Blender's patch removes the Boost dependency.
+  patch -p1 -d "$src" < "$REPO_ROOT/build_files/build_environment/patches/usd_noboost.diff"
+  cmake_install "$src" usd \
+    -DPXR_BUILD_MONOLITHIC=ON \
+    -DPXR_ENABLE_PYTHON_SUPPORT=OFF \
+    -DPXR_BUILD_IMAGING=ON -DPXR_ENABLE_GL_SUPPORT=OFF \
+    -DPXR_ENABLE_MATERIALX_SUPPORT=ON -DPXR_ENABLE_OPENVDB_SUPPORT=ON \
+    -DPXR_BUILD_OPENIMAGEIO_PLUGIN=ON -DPXR_ENABLE_OSL_SUPPORT=OFF \
+    -DPXR_ENABLE_HDF5_SUPPORT=OFF -DPXR_ENABLE_PTEX_SUPPORT=OFF \
+    -DPXR_BUILD_TESTS=OFF -DPXR_BUILD_EXAMPLES=OFF -DPXR_BUILD_TUTORIALS=OFF \
+    -DPXR_BUILD_USDVIEW=OFF -DPXR_BUILD_USD_TOOLS=OFF \
+    -DTBB_ROOT="$LIBDIR/tbb" \
+    -DCMAKE_CXX_FLAGS="-DNOFILE=1024"
+}
+
 build_materialx() {
   local v; v="$(dep_version MATERIALX_VERSION)"
   fetch "materialx-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/MaterialX/archive/refs/tags/v$v.tar.gz"
