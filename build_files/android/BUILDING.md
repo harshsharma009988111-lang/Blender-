@@ -4,8 +4,8 @@ End-to-end guide to reproduce the Android arm64 build on an Apple-Silicon Mac.
 Target: Android 12+ (minSdk 31), built against Android 14 (targetSdk 34).
 
 > Everything installs into a sibling of the repo:
-> `../lib/android_arm64` (harvested deps), `../build_android_<cfg>` (Blender),
-> `../build_host_tools_<cfg>` (native codegen tools), `../android_apk_stage_<cfg>`
+> `../blender_build_android/lib/android_arm64` (harvested deps), `../blender_build_android/build_android_<cfg>` (Blender),
+> `../blender_build_android/build_host_tools_<cfg>` (native codegen tools), `../blender_build_android/android_apk_stage_<cfg>`
 > (APK stage), where `<cfg>` is `full` or `lite`.
 
 ## Build configurations
@@ -30,7 +30,7 @@ build_files/android/build_apk.sh full     # or: lite
 ```
 
 builds the config-matched host tools, cross-compiles `libblender.so`, and
-packages `../android_apk_stage_<cfg>/blender-<cfg>.apk`. The manual steps below
+packages `../blender_build_android/android_apk_stage_<cfg>/blender-<cfg>.apk`. The manual steps below
 show what it does under the hood.
 
 ---
@@ -88,10 +88,10 @@ ffmpeg lzma bzip2 xml2 eigen sse2neon fribidi abseil vulkan_headers meshoptimize
 shaderc numpy usd llvm rubberband
 ```
 
-Each installs to `../lib/android_arm64/<name>`; verify with:
+Each installs to `../blender_build_android/lib/android_arm64/<name>`; verify with:
 
 ```bash
-$ANDROID_LLVM_BIN/llvm-objdump -f ../lib/android_arm64/<name>/lib/lib*.so | grep aarch64
+$ANDROID_LLVM_BIN/llvm-objdump -f ../blender_build_android/lib/android_arm64/<name>/lib/lib*.so | grep aarch64
 ```
 
 Notes / gotchas (all handled by build.sh):
@@ -112,9 +112,9 @@ datatoc, msgfmt). These must run on the host, so build them natively with the
 **same feature flags** as the target (else generated RNA/DNA mismatch):
 
 ```bash
-cmake -S . -B ../build_host_tools -G Ninja \
+cmake -S . -B ../blender_build_android/build_host_tools -G Ninja \
   -C build_files/android/android_features_full.cmake -DWITH_CROSSCOMPILED_TOOLS=OFF
-ninja -C ../build_host_tools makesdna makesrna datatoc msgfmt shader_tool
+ninja -C ../blender_build_android/build_host_tools makesdna makesrna datatoc msgfmt shader_tool
 ```
 
 ---
@@ -123,13 +123,13 @@ ninja -C ../build_host_tools makesdna makesrna datatoc msgfmt shader_tool
 
 ```bash
 source build_files/android/env.sh
-cmake -S . -B ../build_android_blender -G Ninja \
+cmake -S . -B ../blender_build_android/build_android_blender -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$ANDROID_TOOLCHAIN_FILE" \
   -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-31
-ninja -C ../build_android_blender blender
+ninja -C ../blender_build_android/build_android_blender blender
 ```
 
-Produces `../build_android_blender/lib/libblender.so` (an arm64 shared library;
+Produces `../blender_build_android/build_android_blender/lib/libblender.so` (an arm64 shared library;
 `platform_android.cmake` selects the shared-lib + NativeActivity path).
 
 ---
@@ -143,7 +143,7 @@ build_files/android/apk/package.sh
 This gathers `libblender.so` + all transitive `.so` deps (stripped), bundles the
 runtime payload (Python stdlib + numpy, `scripts/`, `datafiles/`) as
 `blender_runtime.zip`, compiles `BlenderActivity`, and assembles a debug-signed
-APK at `../android_apk_stage_<cfg>/blender-<cfg>.apk`, sideloadable. Sizes:
+APK at `../blender_build_android/android_apk_stage_<cfg>/blender-<cfg>.apk`, sideloadable. Sizes:
 **lite ≈ 115 MB**, **full ≈ 166 MB** (129 native libs vs 105).
 
 On first launch `BlenderActivity` extracts the runtime to
@@ -157,14 +157,14 @@ On first launch `BlenderActivity` extracts the runtime to
 
 **adb:**
 ```bash
-adb install -r ../android_apk_stage/blender.apk
+adb install -r ../blender_build_android/android_apk_stage/blender.apk
 adb shell am start -n org.blender.blender/.BlenderActivity
 adb logcat --pid=$(adb shell pidof org.blender.blender)
 ```
 
 **Android Studio (Run/Debug):** run `package.sh` once (to stage libs+assets),
 then open `build_files/android/apk` as a project. The gradle app module consumes
-`../android_apk_stage/{lib,assets}` and can Run/Debug on a device or AVD.
+`../blender_build_android/android_apk_stage/{lib,assets}` and can Run/Debug on a device or AVD.
 
 ---
 

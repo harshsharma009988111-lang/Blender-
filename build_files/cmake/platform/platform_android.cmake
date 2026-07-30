@@ -8,9 +8,13 @@
 # WIP: establishes LIBDIR and the per-package <Pkg>_ROOT hints, and disables
 # desktop-only features. Full configure is being brought up incrementally.
 
+if(NOT DEFINED BUILD_BASE)
+  # All Android build artifacts live under this sibling dir (see build_apk.sh).
+  set(BUILD_BASE "${CMAKE_SOURCE_DIR}/../blender_build_android")
+endif()
 if(NOT DEFINED LIBDIR)
-  # Sibling of the source tree, matching the deps builder's default.
-  set(LIBDIR "${CMAKE_SOURCE_DIR}/../lib/android_arm64")
+  # Harvested deps, matching the deps builder's default.
+  set(LIBDIR "${BUILD_BASE}/lib/android_arm64")
 endif()
 if(NOT EXISTS "${LIBDIR}")
   message(FATAL_ERROR "Android LIBDIR not found: ${LIBDIR}\n"
@@ -113,7 +117,7 @@ add_definitions(-DVK_USE_PLATFORM_ANDROID_KHR)
 set(WITH_CROSSCOMPILED_TOOLS ON)
 if(NOT DEFINED CROSSCOMPILE_TOOLDIR)
   # Host tools are config-specific (generated code matches the feature set).
-  set(CROSSCOMPILE_TOOLDIR "${CMAKE_SOURCE_DIR}/../build_host_tools_${BLENDER_ANDROID_CONFIG}/bin")
+  set(CROSSCOMPILE_TOOLDIR "${BUILD_BASE}/build_host_tools_${BLENDER_ANDROID_CONFIG}/bin")
 endif()
 foreach(_tool makesdna makesrna datatoc msgfmt shader_tool)
   if(NOT EXISTS "${CROSSCOMPILE_TOOLDIR}/${_tool}")

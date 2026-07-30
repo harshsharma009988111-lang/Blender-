@@ -9,10 +9,11 @@ plugins {
   id 'com.android.application'
 }
 
-// Sibling of the repo: <repo>/../android_apk_stage_<cfg>. Pick the config with
-// -PblenderConfig=lite|full (default full); must be staged by package.sh first.
+// Under the build base: <repo>/../blender_build_android/android_apk_stage_<cfg>.
+// Pick the config with -PblenderConfig=lite|full (default full); must be staged
+// by package.sh first.
 def blenderConfig = project.findProperty('blenderConfig') ?: 'full'
-def stageDir = "${rootDir}/../../../../android_apk_stage_${blenderConfig}"
+def stageDir = "${rootDir}/../../../../blender_build_android/android_apk_stage_${blenderConfig}"
 
 android {
   namespace 'org.blender.blender'

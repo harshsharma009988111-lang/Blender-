@@ -20,9 +20,12 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 # shellcheck source=/dev/null
 source "$REPO_ROOT/build_files/android/env.sh"
 
-: "${LIBDIR:=$REPO_ROOT/../lib/android_$( [ "$ANDROID_ABI" = arm64-v8a ] && echo arm64 || echo "$ANDROID_ABI")}"
-DL_DIR="$REPO_ROOT/../android_deps_build/downloads"
-WORK_DIR="$REPO_ROOT/../android_deps_build/work"
+# All Android build artifacts live under this sibling dir, not scattered in the
+# repo's parent. Override with BUILD_BASE=... if you keep them elsewhere.
+BUILD_BASE="${BUILD_BASE:-$REPO_ROOT/../blender_build_android}"
+: "${LIBDIR:=$BUILD_BASE/lib/android_$( [ "$ANDROID_ABI" = arm64-v8a ] && echo arm64 || echo "$ANDROID_ABI")}"
+DL_DIR="$BUILD_BASE/android_deps_build/downloads"
+WORK_DIR="$BUILD_BASE/android_deps_build/work"
 VERSIONS="$REPO_ROOT/build_files/build_environment/cmake/versions.cmake"
 mkdir -p "$LIBDIR" "$DL_DIR" "$WORK_DIR"
 

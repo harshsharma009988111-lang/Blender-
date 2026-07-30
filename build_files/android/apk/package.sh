@@ -15,11 +15,12 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 source "$REPO_ROOT/build_files/android/env.sh"
 
 CONFIG="${BLENDER_ANDROID_CONFIG:-full}"
-: "${LIBDIR:=$REPO_ROOT/../lib/android_arm64}"
-BUILD="${BUILD:-$REPO_ROOT/../build_android_$CONFIG}"
+BUILD_BASE="${BUILD_BASE:-$REPO_ROOT/../blender_build_android}"
+: "${LIBDIR:=$BUILD_BASE/lib/android_arm64}"
+BUILD="${BUILD:-$BUILD_BASE/build_android_$CONFIG}"
 BT="$ANDROID_HOME/build-tools/35.0.1"
 ANDROID_JAR="$ANDROID_HOME/platforms/android-35/android.jar"
-STAGE="$REPO_ROOT/../android_apk_stage_$CONFIG"
+STAGE="$BUILD_BASE/android_apk_stage_$CONFIG"
 JNI="$STAGE/lib/arm64-v8a"
 OUT="$STAGE/blender-$CONFIG.apk"
 
@@ -120,7 +121,7 @@ cp "$STAGE/base.apk" "$OUT"
 ( cd "$STAGE" && zip -qr "$OUT" lib )
 
 echo "[apk] signing"
-KS="$REPO_ROOT/../android-debug.keystore"  # persistent: stable signature across runs
+KS="$BUILD_BASE/android-debug.keystore"  # persistent: stable signature across runs
 if [ ! -f "$KS" ]; then
   "$JAVA_HOME/bin/keytool" -genkeypair -keystore "$KS" -storepass android \
     -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \

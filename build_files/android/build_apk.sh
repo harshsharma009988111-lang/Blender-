@@ -22,9 +22,23 @@ unset ANDROID_HOME ANDROID_NDK_ROOT ANDROID_NDK_HOME
 source "$SCRIPT_DIR/env.sh"
 cd "$REPO_ROOT"
 
-HOST="$REPO_ROOT/../build_host_tools_$CONFIG"
-BUILD="$REPO_ROOT/../build_android_$CONFIG"
+BUILD_BASE="${BUILD_BASE:-$REPO_ROOT/../blender_build_android}"
+HOST="$BUILD_BASE/build_host_tools_$CONFIG"
+BUILD="$BUILD_BASE/build_android_$CONFIG"
 FEATURES="build_files/android/android_features_$CONFIG.cmake"
+
+# A CMake build dir records its own absolute path; if it was moved, cmake refuses
+# to reconfigure. Wipe a relocated cache so the configure below regenerates it.
+drop_stale_cache() {
+  local d="$1" cache="$1/CMakeCache.txt"
+  [ -f "$cache" ] || return 0
+  if ! grep -q "CMAKE_CACHEFILE_DIR:INTERNAL=$d\$" "$cache" 2>/dev/null; then
+    echo "[build_apk] relocated cache in $d — wiping for a clean reconfigure"
+    rm -rf "$d"
+  fi
+}
+drop_stale_cache "$HOST"
+drop_stale_cache "$BUILD"
 
 echo "=== [$CONFIG] host codegen tools ==="
 if [ ! -x "$HOST/bin/makesdna" ]; then

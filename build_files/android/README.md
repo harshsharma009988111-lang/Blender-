@@ -37,7 +37,7 @@ Defaults: `ABI=arm64-v8a`, `min API=28` (Android 9), `target API=35`.
 build_files/android/configure.sh test
 ```
 
-Builds `build_files/android/toolchain_test/` into `../build_android_toolchain_test/`:
+Builds `build_files/android/toolchain_test/` into `../blender_build_android/build_android_toolchain_test/`:
 an arm64 Android executable plus a shared library linked against `liblog` and
 `libandroid` — the system libs the GHOST backend needs (`ANativeWindow`, logging).
 This proves CMake → NDK → Ninja works before any dependency work.
