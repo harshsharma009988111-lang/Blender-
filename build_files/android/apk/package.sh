@@ -28,45 +28,16 @@ echo "[apk] gathering native libraries"
 cp "$BUILD/lib/libblender.so" "$JNI/"
 cp "$ANDROID_SYSROOT/usr/lib/aarch64-linux-android/libc++_shared.so" "$JNI/"
 
-# Resolve transitive DT_NEEDED from our harvest prefixes + NDK sysroot.
 readelf_needed() {
   "$ANDROID_LLVM_BIN/llvm-readelf" -d "$1" 2>/dev/null |
     sed -nE 's/.*\(NEEDED\).*\[(.*)\]/\1/p'
 }
-# Iteratively resolve until no new libs appear (dedup = "already in $JNI").
+# Android requires unversioned sonames (libX.so, never libX.so.N).
+unversion() { echo "${1%%.so*}.so"; }
 searchdirs=$(ls -d "$LIBDIR"/*/lib 2>/dev/null)
-changed=1
-while [ "$changed" = 1 ]; do
-  changed=0
-  for cur in "$JNI"/*.so; do
-    for need in $(readelf_needed "$cur"); do
-      case "$need" in
-        lib*.so) ;;
-        *) continue;;
-      esac
-      [ -f "$JNI/$need" ] && continue
-      # System libs provided by Android; skip.
-      case "$need" in
-        libc.so|libm.so|libdl.so|liblog.so|libandroid.so|libGLESv1_CM.so|\
-        libGLESv2.so|libGLESv3.so|libEGL.so|libvulkan.so|libOpenSLES.so|\
-        libjnigraphics.so|libz.so) continue;;
-      esac
-      for d in $searchdirs; do
-        if [ -f "$d/$need" ]; then
-          cp "$d/$need" "$JNI/"
-          changed=1
-          break
-        fi
-      done
-    done
-  done
-done
-echo "[apk] stripping native libraries"
-for so in "$JNI"/*.so; do
-  "$ANDROID_LLVM_BIN/llvm-strip" --strip-unneeded "$so" 2>/dev/null || true
-done
-echo "[apk] bundled $(ls "$JNI" | wc -l | tr -d ' ') native libraries ($(du -sh "$JNI" | cut -f1))"
 
+# Assemble the runtime payload first, so its python .so can seed dependency
+# resolution (their NEEDED libs — libffi, ssl, sqlite… — must ship in jniLibs).
 echo "[apk] assembling runtime payload (python + scripts + datafiles)"
 ASSETS="$STAGE/assets"
 PAYLOAD="$STAGE/payload"
@@ -74,8 +45,57 @@ mkdir -p "$ASSETS" "$PAYLOAD/python/lib"
 cp -R "$REPO_ROOT/release/datafiles" "$PAYLOAD/datafiles"
 cp -R "$REPO_ROOT/scripts" "$PAYLOAD/scripts"
 cp -R "$LIBDIR/python/lib/python3.13" "$PAYLOAD/python/lib/python3.13"
-# Trim caches to keep the payload smaller.
 find "$PAYLOAD" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
+
+echo "[apk] gathering native libraries (unversioned)"
+# Seed queue: libblender + c++_shared + every python extension module.
+for so in $(find "$PAYLOAD/python" -name '*.so'); do
+  b="$(unversion "$(basename "$so")")"
+  [ -f "$JNI/$b" ] || cp "$so" "$JNI/$b"
+done
+changed=1
+while [ "$changed" = 1 ]; do
+  changed=0
+  for cur in "$JNI"/*.so; do
+    for need in $(readelf_needed "$cur"); do
+      case "$need" in lib*.so|lib*.so.*) ;; *) continue;; esac
+      base="$(unversion "$need")"
+      [ -f "$JNI/$base" ] && continue
+      case "$base" in
+        libc.so|libm.so|libdl.so|liblog.so|libandroid.so|libGLESv1_CM.so|\
+        libGLESv2.so|libGLESv3.so|libEGL.so|libvulkan.so|libOpenSLES.so|\
+        libjnigraphics.so|libz.so) continue;;
+      esac
+      for d in $searchdirs; do
+        if [ -f "$d/$base" ]; then cp "$d/$base" "$JNI/$base"; changed=1; break; fi
+        cand=$(ls "$d/$base".* 2>/dev/null | head -1 || true)
+        if [ -n "$cand" ]; then cp "$cand" "$JNI/$base"; changed=1; break; fi
+      done
+    done
+  done
+done
+
+echo "[apk] rewriting sonames + NEEDED to unversioned"
+patch_unversion() {
+  patchelf --set-soname "$(basename "$1")" "$1" 2>/dev/null || true
+  for need in $(readelf_needed "$1"); do
+    case "$need" in
+      *.so.*) patchelf --replace-needed "$need" "$(unversion "$need")" "$1" 2>/dev/null || true;;
+    esac
+  done
+}
+for so in "$JNI"/*.so; do patch_unversion "$so"; done
+# Python extension modules load from filesDir but resolve NEEDED via jniLibs.
+for so in $(find "$PAYLOAD/python" -name '*.so'); do
+  patch_unversion "$so"
+done
+
+echo "[apk] stripping native libraries"
+for so in "$JNI"/*.so; do
+  "$ANDROID_LLVM_BIN/llvm-strip" --strip-unneeded "$so" 2>/dev/null || true
+done
+echo "[apk] bundled $(ls "$JNI" | wc -l | tr -d ' ') native libraries ($(du -sh "$JNI" | cut -f1))"
+
 ( cd "$PAYLOAD" && zip -qr -X "$ASSETS/blender_runtime.zip" . )
 echo "[apk] runtime payload: $(du -sh "$ASSETS/blender_runtime.zip" | cut -f1)"
 
@@ -99,7 +119,7 @@ cp "$STAGE/base.apk" "$OUT"
 ( cd "$STAGE" && zip -qr "$OUT" lib )
 
 echo "[apk] signing"
-KS="$STAGE/debug.keystore"
+KS="$REPO_ROOT/../android-debug.keystore"  # persistent: stable signature across runs
 "$JAVA_HOME/bin/keytool" -genkeypair -keystore "$KS" -storepass android \
   -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
   -dname "CN=Android Debug,O=Android,C=US" >/dev/null 2>&1

@@ -12,8 +12,43 @@
 #include "GHOST_ISystem.hh"
 #include "GHOST_SystemAndroid.hh"
 
+#include <android/log.h>
 #include <android_native_app_glue.h>
+#include <cstdio>
 #include <jni.h>
+#include <pthread.h>
+#include <unistd.h>
+
+/* Route Blender's stdout/stderr to logcat (tag "blender") so init/errors are
+ * visible; NativeActivity otherwise discards them. */
+static int g_stdio_pipe[2];
+static void *ghost_android_stdio_thread(void * /*arg*/)
+{
+  char line[1024];
+  ssize_t count;
+  while ((count = read(g_stdio_pipe[0], line, sizeof(line) - 1)) > 0) {
+    if (line[count - 1] == '\n') {
+      count--;
+    }
+    line[count] = '\0';
+    __android_log_write(ANDROID_LOG_INFO, "blender", line);
+  }
+  return nullptr;
+}
+static void ghost_android_redirect_stdio()
+{
+  setvbuf(stdout, nullptr, _IONBF, 0);
+  setvbuf(stderr, nullptr, _IONBF, 0);
+  if (pipe(g_stdio_pipe) != 0) {
+    return;
+  }
+  dup2(g_stdio_pipe[1], STDOUT_FILENO);
+  dup2(g_stdio_pipe[1], STDERR_FILENO);
+  pthread_t thread;
+  if (pthread_create(&thread, nullptr, ghost_android_stdio_thread, nullptr) == 0) {
+    pthread_detach(thread);
+  }
+}
 
 namespace blender {
 struct bContext;
@@ -97,6 +132,7 @@ extern "C" JNIEXPORT void JNICALL Java_org_blender_blender_BlenderActivity_nativ
 
 extern "C" void android_main(struct android_app *app)
 {
+  ghost_android_redirect_stdio();
   GHOST_SystemAndroid::setAndroidApp(app);
   app->onAppCmd = on_app_cmd;
   app->onInputEvent = on_input_event;
