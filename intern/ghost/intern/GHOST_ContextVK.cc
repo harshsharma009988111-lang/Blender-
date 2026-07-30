@@ -1570,7 +1570,14 @@ GHOST_TSuccess GHOST_ContextVK::recreateSwapchain(bool use_hdr_swapchain)
   create_info.imageArrayLayers = 1;
   create_info.imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT |
                            (use_hdr_swapchain ? VK_IMAGE_USAGE_STORAGE_BIT : 0);
-  create_info.preTransform = capabilities.currentTransform;
+  /* Blender does not pre-rotate its rendering, so requesting the surface's
+   * currentTransform (e.g. ROTATE_90 on portrait-native tablets) would show the
+   * UI sideways. Request IDENTITY when supported and let the display compositor
+   * apply the rotation. */
+  create_info.preTransform =
+      (capabilities.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) ?
+          VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR :
+          capabilities.currentTransform;
   create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
   create_info.presentMode = present_mode;
   create_info.clipped = VK_TRUE;
