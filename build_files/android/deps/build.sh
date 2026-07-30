@@ -616,7 +616,10 @@ build_usd() {
     "$src/pxr/base/arch/defines.h"
   cmake_install "$src" usd \
     -DPXR_BUILD_MONOLITHIC=ON \
-    -DPXR_ENABLE_PYTHON_SUPPORT=OFF \
+    -DPXR_ENABLE_PYTHON_SUPPORT=ON -DPXR_USE_PYTHON_3=ON \
+    -DPython3_EXECUTABLE=/opt/homebrew/bin/python3.13 \
+    -DPython3_INCLUDE_DIR="$LIBDIR/python/include/python3.13" \
+    -DPython3_LIBRARY="$LIBDIR/python/lib/libpython3.13.so" \
     -DPXR_BUILD_IMAGING=ON -DPXR_ENABLE_GL_SUPPORT=OFF \
     -DPXR_ENABLE_MATERIALX_SUPPORT=ON -DPXR_ENABLE_OPENVDB_SUPPORT=ON \
     -DPXR_BUILD_OPENIMAGEIO_PLUGIN=ON -DPXR_ENABLE_OSL_SUPPORT=OFF \
