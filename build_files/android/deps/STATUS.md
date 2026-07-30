@@ -29,6 +29,27 @@ expat · yaml-cpp · c-blosc
 - Blender cannot link/run until at least Python + the imaging/USD stack are up.
   The remaining tier is genuinely multi-day.
 
+## Strategy for the hard tier (use the iOS branch as a blueprint)
+
+The `origin/ios` branch already cross-compiled the whole hard tier to a mobile
+ARM target. Reuse that work per dependency:
+
+1. `git show origin/ios:build_files/build_environment/patches/<dep>_ios.diff`
+   — see exactly what they had to change to cross-compile it.
+2. Adapt, don't copy: the iOS patches target Apple's toolchain/sysroot and have
+   Apple-only bits (SDK paths, `libb2_apple`, x265 Apple asm, Metal). Keep the
+   generic cross-compile fixes (host-tool assumptions, failing `configure`
+   checks, disabled subcomponents); drop/replace the Apple-specific parts.
+3. Cross-check `origin/ios:build_files/build_environment/cmake/ios_defines.cmake`
+   for the flags/vars they passed each dep, and `<dep>.cmake` for the base args.
+4. Store any Android patch as `build_files/android/deps/patches/<dep>_android.diff`
+   and apply it in that dep's `build_*` function before configure.
+
+Available iOS patches: brotli, embree, ffmpeg, ispc, libb2(apple), llvm,
+opencolorio, openimageio, osl, python, rubberband, usd, x265(apple).
+Key proof point: Python, LLVM and USD are all in there — the mobile port is
+known-possible, not speculative.
+
 ## Next steps
 
 1. Patch + build OpenSubdiv.
