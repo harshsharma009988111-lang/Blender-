@@ -372,6 +372,61 @@ build_openssl() {
   echo "[deps] installed openssl -> $LIBDIR/openssl"
 }
 
+build_python() {
+  local v; v="$(dep_version PYTHON_VERSION)"  # 3.13.13
+  local mm="${v%.*}"                           # 3.13
+  fetch "Python-$v.tar.xz" "https://www.python.org/ftp/python/$v/Python-$v.tar.xz"
+
+  # Stage 1: a host interpreter of the exact version, for cross build tooling.
+  local host_src; host_src="$(extract "Python-$v.tar.xz" python-host)"
+  local host_prefix="$WORK_DIR/python-host-install"
+  if [ ! -x "$host_prefix/bin/python$mm" ]; then
+    ( cd "$host_src" && ./configure --prefix="$host_prefix" --without-ensurepip \
+        --disable-test-modules >/dev/null &&
+      make -j"$(sysctl -n hw.ncpu)" >/dev/null && make install >/dev/null )
+  fi
+
+  # Stage 2: cross-compile for Android against our harvested deps.
+  local src; src="$(extract "Python-$v.tar.xz" python)"
+  local site="$WORK_DIR/python-config.site"
+  cat >"$site" <<'EOF'
+ac_cv_file__dev_ptmx=no
+ac_cv_file__dev_ptc=no
+ac_cv_little_endian_double=yes
+EOF
+  export CC="$ANDROID_LLVM_BIN/aarch64-linux-android${ANDROID_API}-clang"
+  export CXX="$ANDROID_LLVM_BIN/aarch64-linux-android${ANDROID_API}-clang++"
+  export AR="$ANDROID_LLVM_BIN/llvm-ar" RANLIB="$ANDROID_LLVM_BIN/llvm-ranlib"
+  export READELF="$ANDROID_LLVM_BIN/llvm-readelf"
+  export CONFIG_SITE="$site"
+  export CPPFLAGS="-I$LIBDIR/zlib/include -I$LIBDIR/sqlite/include -I$LIBDIR/libffi/include"
+  export LDFLAGS="-L$LIBDIR/zlib/lib -L$LIBDIR/sqlite/lib -L$LIBDIR/libffi/lib"
+  export PKG_CONFIG_LIBDIR="$LIBDIR/libffi/lib/pkgconfig:$LIBDIR/openssl/lib/pkgconfig:$LIBDIR/zlib/lib/pkgconfig:$LIBDIR/sqlite/lib/pkgconfig"
+  ( cd "$src" &&
+    ./configure --host=aarch64-linux-android --build="$(./config.guess)" \
+      --with-build-python="$host_prefix/bin/python$mm" \
+      --with-openssl="$LIBDIR/openssl" \
+      --enable-shared --without-ensurepip --disable-test-modules \
+      --prefix="$LIBDIR/python" &&
+    make -j"$(sysctl -n hw.ncpu)" && make install )
+  unset CC CXX AR RANLIB READELF CONFIG_SITE CPPFLAGS LDFLAGS PKG_CONFIG_LIBDIR
+  echo "[deps] installed python -> $LIBDIR/python"
+}
+
+build_openvdb() {
+  local v; v="$(dep_version OPENVDB_VERSION)"
+  fetch "openvdb-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/openvdb/archive/v$v.tar.gz"
+  local src; src="$(extract "openvdb-$v.tar.gz" openvdb)"
+  # DELAYED_LOADING=OFF drops the Boost dependency (not used by Blender).
+  cmake_install "$src" openvdb \
+    -DOPENVDB_USE_DELAYED_LOADING=OFF \
+    -DOPENVDB_CORE_SHARED=ON -DOPENVDB_CORE_STATIC=OFF \
+    -DOPENVDB_BUILD_BINARIES=OFF -DOPENVDB_BUILD_UNITTESTS=OFF \
+    -DOPENVDB_BUILD_NANOVDB=ON -DNANOVDB_BUILD_TOOLS=OFF -DUSE_NANOVDB=ON \
+    -DOPENVDB_BUILD_PYTHON_MODULE=OFF \
+    -DUSE_BLOSC=ON -DBlosc_ROOT="$LIBDIR/blosc" -DTBB_ROOT="$LIBDIR/tbb"
+}
+
 build_materialx() {
   local v; v="$(dep_version MATERIALX_VERSION)"
   fetch "materialx-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/MaterialX/archive/refs/tags/v$v.tar.gz"
