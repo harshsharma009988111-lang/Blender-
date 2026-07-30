@@ -14,8 +14,25 @@ potrace · sqlite · libffi · OpenSSL · **Python 3.13** · OpenVDB(+NanoVDB) �
 ogg · vorbis · theora · opus · lame · aom · x265 · libvpx · x264 · **ffmpeg** ·
 **OpenUSD 26.03** · **LLVM 20.1.8 + clang**
 
-Next: OSL (needs a host clang matching LLVM to generate bitcode — thorny),
-then a platform_android.cmake to point Blender's main build at lib/android_arm64.
+## Main-build integration
+
+- ✅ platform_android.cmake wires all harvested deps; `cmake` **configures and
+  generates** with no errors (WITH_CYCLES CPU+embree, USD/OpenVDB/OIIO/OCIO/
+  MaterialX/LLVM/Python all found).
+- ✅ Non-codegen targets compile (e.g. bf_intern_guardedalloc).
+- ⛔ BLOCKER: Blender's build-time codegen tools (makesdna, makesrna,
+  shader_tool, datatoc, datatoc_icon, msgformat) get cross-compiled for arm64
+  and can't run on the macOS host ("Unknown system error -8").
+  FIX (iOS blueprint): port the `WITH_CROSSCOMPILED_TOOLS` mechanism from
+  `origin/ios` (platform_apple.cmake + the tools' CMakeLists). It builds those
+  tools natively for the host (`blender_cross_tools_compile`) and imports them
+  as IMPORTED executables from `CROSSCOMPILE_TOOLDIR/bin`. This is generic
+  cross logic, not Apple-specific — adapt it for Android.
+
+Then: link libblender.so, then OSL (host clang for bitcode), then APK.
+
+Old notes:
+Next: OSL (needs a host clang matching LLVM to generate bitcode — thorny).
 
 Notes:
 - OpenColorIO: Python bindings off (Python not yet ported), SSE off (arm64);
