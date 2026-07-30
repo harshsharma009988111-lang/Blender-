@@ -157,6 +157,21 @@ void VKDevice::init(GHOST_IContext *ghost_context)
 
   volkLoadDeviceTable(&functions, vk_device_);
 
+  /* On Vulkan 1.1 devices, functions promoted to 1.2/1.3 core are only available
+   * under their *KHR names (via the enabled extension). The rest of the backend
+   * calls the core names, so alias any null core pointer to its KHR twin. */
+#define VK_ALIAS_CORE_KHR(fn) \
+  if (functions.fn == nullptr) { \
+    functions.fn = functions.fn##KHR; \
+  }
+  VK_ALIAS_CORE_KHR(vkGetSemaphoreCounterValue);
+  VK_ALIAS_CORE_KHR(vkWaitSemaphores);
+  VK_ALIAS_CORE_KHR(vkSignalSemaphore);
+  VK_ALIAS_CORE_KHR(vkGetBufferDeviceAddress);
+  VK_ALIAS_CORE_KHR(vkGetBufferOpaqueCaptureAddress);
+  VK_ALIAS_CORE_KHR(vkGetDeviceMemoryOpaqueCaptureAddress);
+#undef VK_ALIAS_CORE_KHR
+
   init_physical_device_extensions();
   init_physical_device_properties();
   init_physical_device_memory_properties();
@@ -182,6 +197,11 @@ void VKDevice::init(GHOST_IContext *ghost_context)
 
   init_submission_thread();
   is_initialized_ = true;
+  printf("BLENDER_DBG: VKDevice::init done (api=%u.%u dynamic_rendering=%d)\n",
+         VK_API_VERSION_MAJOR(vk_physical_device_properties_.apiVersion),
+         VK_API_VERSION_MINOR(vk_physical_device_properties_.apiVersion),
+         int(extensions_.dynamic_rendering));
+  fflush(stdout);
 }
 
 void VKDevice::init_debug_callbacks()

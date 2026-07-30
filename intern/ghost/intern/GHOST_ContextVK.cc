@@ -1865,6 +1865,12 @@ GHOST_TSuccess GHOST_ContextVK::initializeDrawingContext()
     /* Optional: absent on Vulkan 1.1 mobile GPUs (e.g. Adreno 642L); the Vulkan
      * backend falls back to classic render passes when it is not enabled. */
     optional_device_extensions.append(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    /* Timeline semaphores and buffer device address are core in Vulkan 1.2 but
+     * must be enabled as extensions on 1.1 devices, otherwise their entry points
+     * (vkGetSemaphoreCounterValue, vkGetBufferDeviceAddress, …) are never loaded.
+     * The backend aliases the core function names to these in vk_device. */
+    optional_device_extensions.append(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
+    optional_device_extensions.append(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
     optional_device_extensions.append(VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME);
     optional_device_extensions.append(VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME);
     optional_device_extensions.append(VK_EXT_SHADER_STENCIL_EXPORT_EXTENSION_NAME);
