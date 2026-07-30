@@ -126,6 +126,25 @@ build_tbb() {
     -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--undefined-version"
 }
 
+build_png() {
+  local v; v="$(dep_version PNG_VERSION)"
+  fetch "libpng-$v.tar.xz" "https://downloads.sourceforge.net/libpng/libpng-$v.tar.xz"
+  local src; src="$(extract "libpng-$v.tar.xz" png)"
+  cmake_install "$src" png \
+    -DCMAKE_PREFIX_PATH="$LIBDIR/zlib" \
+    -DPNG_TESTS=OFF \
+    -DPNG_SHARED=ON \
+    -DPNG_STATIC=ON \
+    -DPNG_TOOLS=OFF
+}
+
+build_pugixml() {
+  local v; v="$(dep_version PUGIXML_VERSION)"
+  fetch "pugixml-$v.tar.gz" "https://github.com/zeux/pugixml/archive/v$v.tar.gz"
+  local src; src="$(extract "pugixml-$v.tar.gz" pugixml)"
+  cmake_install "$src" pugixml -DBUILD_SHARED_LIBS=OFF
+}
+
 build_openexr() {
   local v; v="$(dep_version OPENEXR_VERSION)"
   fetch "openexr-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/openexr/archive/v$v.tar.gz"
