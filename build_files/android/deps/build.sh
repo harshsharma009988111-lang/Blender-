@@ -415,8 +415,8 @@ EOF
   export AR="$ANDROID_LLVM_BIN/llvm-ar" RANLIB="$ANDROID_LLVM_BIN/llvm-ranlib"
   export READELF="$ANDROID_LLVM_BIN/llvm-readelf"
   export CONFIG_SITE="$site"
-  export CPPFLAGS="-I$LIBDIR/zlib/include -I$LIBDIR/sqlite/include -I$LIBDIR/libffi/include"
-  export LDFLAGS="-L$LIBDIR/zlib/lib -L$LIBDIR/sqlite/lib -L$LIBDIR/libffi/lib"
+  export CPPFLAGS="-I$LIBDIR/zlib/include -I$LIBDIR/sqlite/include -I$LIBDIR/libffi/include -I$LIBDIR/lzma/include -I$LIBDIR/bzip2/include"
+  export LDFLAGS="-L$LIBDIR/zlib/lib -L$LIBDIR/sqlite/lib -L$LIBDIR/libffi/lib -L$LIBDIR/lzma/lib -L$LIBDIR/bzip2/lib"
   export PKG_CONFIG_LIBDIR="$LIBDIR/libffi/lib/pkgconfig:$LIBDIR/openssl/lib/pkgconfig:$LIBDIR/zlib/lib/pkgconfig:$LIBDIR/sqlite/lib/pkgconfig"
   ( cd "$src" &&
     ./configure --host=aarch64-linux-android --build="$(./config.guess)" \

@@ -17,11 +17,17 @@ Blender has 97 dep recipes; 46 are cross-compiled (see STATUS.md). The 53
 - **shaderc** — Vulkan backend runtime shader compile (heavy: glslang+SPIRV-Tools);
   build only if the Vulkan backend configure demands it.
 
-## Deferred but wanted later (not blocking first configure)
-- **lzma, bzip2** — Python `_lzma`/`_bz2` stdlib modules (rebuild Python after).
-- **numpy, cython, nanobind, pybind11** — Python site-packages / bpy bindings.
-- **xml2** — Collada (WITH_OPENCOLLADA, off by default).
-- **osl** — needs a host clang matching LLVM 20 for bitcode gen.
+## Deferred-but-wanted — now resolved
+- **lzma, bzip2** — ✅ built; Python rebuilt so `_lzma`/`_bz2` modules exist.
+- **xml2** — ✅ built (libxml2 2.14.6).
+
+## Still deferred (genuinely hard / optional, not blocking Blender launch)
+- **numpy** — full cross-build (meson + BLAS + C extensions); addons want it,
+  core runs without. Add via cross-build or bundled wheel later.
+- **cython, nanobind, pybind11** — only needed to re-enable Python bindings in
+  OCIO/OIIO/USD; header/tool deps, low priority.
+- **osl** — needs a HOST clang matching LLVM 20 (another large host LLVM build)
+  to generate shader bitcode. WITH_CYCLES_OSL stays off until then.
 
 ## Disabled via WITH_* on Android (desktop-only / optional / not needed)
 ceres (libmv off), draco + meshoptimizer (glTF), gmp (exact boolean),
