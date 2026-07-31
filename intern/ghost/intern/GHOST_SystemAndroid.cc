@@ -257,8 +257,10 @@ int32_t GHOST_SystemAndroid::handleMotionEvent(AInputEvent *event)
                                                       GHOST_kTrackpadEventScroll,
                                                       int32_t(cx),
                                                       int32_t(cy),
-                                                      int32_t(cx - gesture_prev_x_),
-                                                      int32_t(cy - gesture_prev_y_),
+                                                      /* Negated so the view follows the
+                                                       * fingers rather than opposing them. */
+                                                      int32_t(gesture_prev_x_ - cx),
+                                                      int32_t(gesture_prev_y_ - cy),
                                                       false));
       pushEvent(std::make_unique<GHOST_EventTrackpad>(getMilliSeconds(),
                                                       window_,
