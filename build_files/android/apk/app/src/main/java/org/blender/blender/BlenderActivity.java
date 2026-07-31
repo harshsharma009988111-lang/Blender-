@@ -37,6 +37,13 @@ import java.util.zip.ZipInputStream;
  */
 public class BlenderActivity extends NativeActivity {
 
+  /* NativeActivity dlopen()s the library from native code, which never registers
+   * it with the class loader, so the JNI lookup for the native methods below
+   * fails with UnsatisfiedLinkError. Load it here as well to register it. */
+  static {
+    System.loadLibrary("blender");
+  }
+
   /* Must match GHOST_SystemPathsAndroid: <filesDir>/blender/<version>. */
   private static final String VERSION = "5.3";
   private static final String RUNTIME_ZIP = "blender_runtime.zip";
