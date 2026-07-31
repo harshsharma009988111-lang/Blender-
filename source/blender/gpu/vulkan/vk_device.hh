@@ -13,6 +13,9 @@
 
 #include "BLI_threads.hh"
 #include "BLI_utility_mixins.hh"
+#include <mutex>
+
+#include "BLI_map.hh"
 #include "BLI_vector.hh"
 
 #include "render_graph/vk_render_graph.hh"
@@ -251,6 +254,10 @@ class VKDevice : public NonCopyable {
 
   Shader *vk_backbuffer_blit_sh_ = nullptr;
 
+  /** Cache for #format_supports_linear_filter, filled on demand. */
+  mutable Map<VkFormat, bool> format_linear_filter_support_;
+  mutable std::mutex format_linear_filter_mutex_;
+
  public:
   render_graph::VKResourceStateTracker resources;
   VKDiscardPool orphaned_data;
@@ -282,6 +289,9 @@ class VKDevice : public NonCopyable {
   {
     return vk_physical_device_properties_;
   }
+
+  /** Mobile GPUs commonly lack linear filtering for 32-bit float formats. */
+  bool format_supports_linear_filter(VkFormat vk_format) const;
 
   inline const VkPhysicalDeviceMaintenance4Properties &
   physical_device_maintenance4_properties_get() const

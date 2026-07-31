@@ -204,6 +204,17 @@ void VKDevice::init_debug_callbacks()
   debugging_tools_.init(vk_instance_);
 }
 
+bool VKDevice::format_supports_linear_filter(VkFormat vk_format) const
+{
+  std::scoped_lock lock(format_linear_filter_mutex_);
+  return format_linear_filter_support_.lookup_or_add_cb(vk_format, [&]() {
+    VkFormatProperties properties = {};
+    vkGetPhysicalDeviceFormatProperties(vk_physical_device_, vk_format, &properties);
+    return (properties.optimalTilingFeatures &
+            VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT) != 0;
+  });
+}
+
 void VKDevice::init_physical_device_properties()
 {
   BLI_assert(vk_physical_device_ != VK_NULL_HANDLE);

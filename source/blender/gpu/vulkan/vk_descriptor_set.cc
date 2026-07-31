@@ -23,6 +23,12 @@ namespace blender::gpu {
 
 static CLG_LogRef LOG = {"gpu.vulkan"};
 
+/* Sampling with linear filtering is only valid when the format supports it. */
+static bool needs_nearest_filter(const VKDevice &device, const VKTexture &texture)
+{
+  return !device.format_supports_linear_filter(to_vk_format(texture.device_format_get()));
+}
+
 void VKDescriptorSetTracker::update_descriptor_set(VKContext &context,
                                                    render_graph::VKResourceAccessInfo &access_info,
                                                    render_graph::VKPipelineData &r_pipeline_data)
@@ -365,7 +371,8 @@ void VKDescriptorSetUpdator::bind_texture_resource(const VKDevice &device,
         bind_texel_buffer(vertex_buffer, resource_binding.location);
       }
       else {
-        const VKSampler &sampler = device.samplers().get(elem.sampler);
+        const VKSampler &sampler = device.samplers().get(elem.sampler,
+                                                         needs_nearest_filter(device, *texture));
         bind_image(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                    sampler.vk_handle(),
                    texture->image_view_get(resource_binding.arrayed, VKImageViewFlags::DEFAULT)
@@ -409,7 +416,8 @@ void VKDescriptorSetUpdator::bind_input_attachment_resource(
     VKTexture *texture = static_cast<VKTexture *>(elem.resource);
     BLI_assert(texture);
     BLI_assert(elem.resource_type == BindSpaceTextures::Type::Texture);
-    const VKSampler &sampler = device.samplers().get(elem.sampler);
+    const VKSampler &sampler = device.samplers().get(elem.sampler,
+                                                     needs_nearest_filter(device, *texture));
     bind_image(
         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         sampler.vk_handle(),
