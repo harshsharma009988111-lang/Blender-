@@ -131,6 +131,11 @@ GHOST_IWindow *GHOST_SystemAndroid::createWindow(const char *title,
   if (!app_ || !app_->window) {
     return nullptr;
   }
+  /* Only one window exists on Android; its surface is exclusive to the native
+   * window, so report failure rather than hand back a window that cannot draw. */
+  if (window_ != nullptr) {
+    return nullptr;
+  }
 
   const GHOST_ContextParams context_params = GHOST_CONTEXT_PARAMS_FROM_GPU_SETTINGS(gpu_settings);
 
