@@ -40,9 +40,9 @@ VkRenderPass VKRenderPassFallback::render_pass_from_key(const RenderPassKey &key
       desc.storeOp = VkAttachmentStoreOp(key.color_store[i]);
       desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
       desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-      desc.initialLayout = key.color_layout;
-      desc.finalLayout = key.color_layout;
-      color_refs[i] = {attachment_count, key.color_layout};
+      desc.initialLayout = key.color_layouts[i];
+      desc.finalLayout = key.color_layouts[i];
+      color_refs[i] = {attachment_count, key.color_layouts[i]};
       attachment_count++;
     }
 
@@ -119,14 +119,13 @@ VkRenderPass VKRenderPassFallback::render_pass_get(const render_graph::VKBeginRe
 {
   RenderPassKey key = {};
   key.color_count = data.vk_rendering_info.colorAttachmentCount;
-  key.color_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
   for (uint32_t i = 0; i < key.color_count; i++) {
     key.color_formats[i] = data.color_formats[i];
     key.color_load[i] = uint8_t(data.color_attachments[i].loadOp);
     key.color_store[i] = uint8_t(data.color_attachments[i].storeOp);
-    if (data.color_attachments[i].imageView != VK_NULL_HANDLE) {
-      key.color_layout = data.color_attachments[i].imageLayout;
-    }
+    key.color_layouts[i] = data.color_attachments[i].imageView != VK_NULL_HANDLE ?
+                               data.color_attachments[i].imageLayout :
+                               VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
   }
   key.depth_format = data.depth_format;
   key.stencil_format = data.stencil_format;
@@ -149,9 +148,9 @@ VkRenderPass VKRenderPassFallback::compat_render_pass_get(Span<VkFormat> color_f
 {
   RenderPassKey key = {};
   key.color_count = uint32_t(color_formats.size());
-  key.color_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
   for (uint32_t i = 0; i < key.color_count && i < 8; i++) {
     key.color_formats[i] = color_formats[i];
+    key.color_layouts[i] = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     /* Compatibility ignores load/store, use generic values so pipelines share
      * a render pass regardless of clear/load behavior. */
     key.color_load[i] = uint8_t(VK_ATTACHMENT_LOAD_OP_LOAD);

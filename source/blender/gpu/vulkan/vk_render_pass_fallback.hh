@@ -47,7 +47,8 @@ class VKRenderPassFallback {
     VkFormat color_formats[8];
     uint8_t color_load[8];
     uint8_t color_store[8];
-    VkImageLayout color_layout;
+    /** Per attachment: attachments in one pass can be in different layouts. */
+    VkImageLayout color_layouts[8];
     VkFormat depth_format;
     VkFormat stencil_format;
     uint8_t depth_load, depth_store, stencil_load, stencil_store;
