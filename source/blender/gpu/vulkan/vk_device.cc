@@ -197,11 +197,6 @@ void VKDevice::init(GHOST_IContext *ghost_context)
 
   init_submission_thread();
   is_initialized_ = true;
-  printf("BLENDER_DBG: VKDevice::init done (api=%u.%u dynamic_rendering=%d)\n",
-         VK_API_VERSION_MAJOR(vk_physical_device_properties_.apiVersion),
-         VK_API_VERSION_MINOR(vk_physical_device_properties_.apiVersion),
-         int(extensions_.dynamic_rendering));
-  fflush(stdout);
 }
 
 void VKDevice::init_debug_callbacks()

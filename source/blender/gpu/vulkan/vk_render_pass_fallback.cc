@@ -192,15 +192,6 @@ namespace render_graph {
 void begin_rendering_fallback(VKCommandBufferInterface &command_buffer,
                               const VKBeginRenderingData &data)
 {
-  static int dbg_count = 0;
-  if (dbg_count < 5) {
-    printf("BLENDER_DBG: begin_rendering_fallback #%d color_count=%u depth=%d\n",
-           dbg_count,
-           data.vk_rendering_info.colorAttachmentCount,
-           int(data.depth_format != VK_FORMAT_UNDEFINED));
-    fflush(stdout);
-    dbg_count++;
-  }
   VKRenderPassFallback &fallback = VKBackend::get().device.render_pass_fallback;
   VkRenderPass vk_render_pass = fallback.render_pass_get(data);
   VkFramebuffer vk_framebuffer = fallback.framebuffer_get(vk_render_pass, data);

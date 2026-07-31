@@ -606,8 +606,6 @@ int main(int argc,
 #endif
 
   WM_init(C, argc, argv);
-  printf("BLENDER_DBG: WM_init returned\n");
-  fflush(stdout);
 
 #ifndef WITH_PYTHON
   fprintf(stderr,
@@ -664,21 +662,13 @@ int main(int argc,
     /* Not supported, although it could be made to work if needed. */
     BLI_assert(app_state.main_arg_deferred == nullptr);
 
-    printf("BLENDER_DBG: before ARG_PASS_FINAL done, before splash\n");
-    fflush(stdout);
     /* Shows the splash as needed. */
     WM_init_splash_on_startup(C);
-    printf("BLENDER_DBG: splash done\n");
-    fflush(stdout);
 
 #ifdef WITH_GHOST_ANDROID
     /* Return to the NativeActivity loop, which drives WM_main_loop_body. */
     WM_main_entry(C);
-    printf("BLENDER_DBG: WM_main_entry returned, calling finalize\n");
-    fflush(stdout);
     GHOST_androidfinalize(C);
-    printf("BLENDER_DBG: androidfinalize done (g_context set)\n");
-    fflush(stdout);
   }
 #else
     WM_main(C);
