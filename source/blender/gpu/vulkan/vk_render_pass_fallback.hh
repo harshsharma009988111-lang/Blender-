@@ -18,6 +18,7 @@
 #pragma once
 
 #include <cstring>
+#include <mutex>
 
 #include "xxhash.h"
 
@@ -27,6 +28,8 @@
 #include "vk_common.hh"
 
 namespace blender::gpu {
+
+class VKDiscardPool;
 
 namespace render_graph {
 struct VKBeginRenderingData;
@@ -78,6 +81,8 @@ class VKRenderPassFallback {
 
   Map<RenderPassKey, VkRenderPass> render_passes_;
   Map<FramebufferKey, VkFramebuffer> framebuffers_;
+  /** Guards the caches (accessed from the submission thread and view-discard). */
+  std::mutex mutex_;
 
   VkRenderPass render_pass_from_key(const RenderPassKey &key);
 
@@ -103,6 +108,13 @@ class VKRenderPassFallback {
   /** Framebuffer wrapping the attachment image views for `data`. */
   VkFramebuffer framebuffer_get(VkRenderPass vk_render_pass,
                                 const render_graph::VKBeginRenderingData &data);
+
+  /**
+   * Retire (into `pool`, deferred to its timeline) any cached framebuffer that
+   * references `vk_image_view`. Called when a view is discarded so a recycled
+   * view handle can't match a stale cached framebuffer.
+   */
+  void discard_framebuffers_for_view(VkImageView vk_image_view, VKDiscardPool &pool);
 };
 
 }  // namespace blender::gpu

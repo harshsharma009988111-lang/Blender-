@@ -14,11 +14,15 @@
 #include "render_graph/vk_command_buffer_wrapper.hh"
 #include "vk_backend.hh"
 #include "vk_device.hh"
+#include "vk_resource_pool.hh"
+
+#include "BLI_vector.hh"
 
 namespace blender::gpu {
 
 VkRenderPass VKRenderPassFallback::render_pass_from_key(const RenderPassKey &key)
 {
+  std::scoped_lock lock(mutex_);
   return render_passes_.lookup_or_add_cb(key, [&]() {
     VkAttachmentDescription attachments[9] = {};
     uint32_t attachment_count = 0;
@@ -69,11 +73,41 @@ VkRenderPass VKRenderPassFallback::render_pass_from_key(const RenderPassKey &key
     subpass.pColorAttachments = key.color_count ? color_refs : nullptr;
     subpass.pDepthStencilAttachment = has_depth ? &depth_ref : nullptr;
 
+    /* With initialLayout == finalLayout Vulkan inserts no implicit external
+     * dependency, so unlike dynamic rendering the render pass isn't synchronized
+     * against surrounding commands. Add explicit external dependencies covering
+     * the attachment read/write stages so prior writes are visible and results
+     * are flushed (missing sync manifests as a GPU hang on Adreno). */
+    const VkPipelineStageFlags gfx_stages = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                                            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                                            VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    const VkAccessFlags gfx_access = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+                                     VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                                     VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                                     VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    VkSubpassDependency deps[2] = {};
+    deps[0] = {VK_SUBPASS_EXTERNAL,
+               0,
+               VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+               gfx_stages,
+               VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
+               gfx_access,
+               VK_DEPENDENCY_BY_REGION_BIT};
+    deps[1] = {0,
+               VK_SUBPASS_EXTERNAL,
+               gfx_stages,
+               VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+               gfx_access,
+               VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
+               VK_DEPENDENCY_BY_REGION_BIT};
+
     VkRenderPassCreateInfo create_info = {VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
     create_info.attachmentCount = attachment_count;
     create_info.pAttachments = attachments;
     create_info.subpassCount = 1;
     create_info.pSubpasses = &subpass;
+    create_info.dependencyCount = 2;
+    create_info.pDependencies = deps;
 
     VkRenderPass vk_render_pass = VK_NULL_HANDLE;
     functions_->vkCreateRenderPass(vk_device_, &create_info, nullptr, &vk_render_pass);
@@ -157,6 +191,7 @@ VkFramebuffer VKRenderPassFallback::framebuffer_get(
     key.views[key.view_count++] = data.stencil_attachment.imageView;
   }
 
+  std::scoped_lock lock(mutex_);
   return framebuffers_.lookup_or_add_cb(key, [&]() {
     VkFramebufferCreateInfo create_info = {VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
     create_info.renderPass = vk_render_pass;
@@ -172,11 +207,36 @@ VkFramebuffer VKRenderPassFallback::framebuffer_get(
   });
 }
 
+void VKRenderPassFallback::discard_framebuffers_for_view(VkImageView vk_image_view,
+                                                         VKDiscardPool &pool)
+{
+  if (vk_device_ == VK_NULL_HANDLE || vk_image_view == VK_NULL_HANDLE) {
+    return;
+  }
+  Vector<FramebufferKey> to_remove;
+  {
+    std::scoped_lock lock(mutex_);
+    for (auto item : framebuffers_.items()) {
+      for (uint32_t i = 0; i < item.key.view_count; i++) {
+        if (item.key.views[i] == vk_image_view) {
+          pool.discard_framebuffer(item.value);
+          to_remove.append(item.key);
+          break;
+        }
+      }
+    }
+    for (const FramebufferKey &key : to_remove) {
+      framebuffers_.remove_contained(key);
+    }
+  }
+}
+
 void VKRenderPassFallback::deinit()
 {
   if (vk_device_ == VK_NULL_HANDLE) {
     return;
   }
+  std::scoped_lock lock(mutex_);
   for (VkFramebuffer vk_framebuffer : framebuffers_.values()) {
     functions_->vkDestroyFramebuffer(vk_device_, vk_framebuffer, nullptr);
   }
