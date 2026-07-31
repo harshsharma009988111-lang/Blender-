@@ -30,6 +30,10 @@
 #include "GHOST_ContextVK.hh"
 #include "GHOST_Types.hh"
 
+#ifdef __ANDROID__
+#  include <android/log.h>
+#endif
+
 #include "vulkan/vk_ghost_api.hh"
 
 #if !defined(_WIN32) or defined(_M_ARM64)
@@ -392,6 +396,7 @@ struct GHOST_InstanceVK {
                                                     extensions.enabled.data()
 
     };
+
 
     VK_CHECK(volk::vkCreateInstance(&vk_instance_create_info, nullptr, &vk_instance), false);
     return true;
@@ -1988,6 +1993,11 @@ GHOST_TSuccess GHOST_ContextVK::setAndroidNativeWindow(ANativeWindow *native_win
    * on the render thread at the swap boundary (applyAndroidSurfaceChange), where
    * the backend's submission thread is synchronized. Doing it here races the
    * submission thread and corrupts the heap (double free). */
+  __android_log_print(ANDROID_LOG_INFO,
+                      "blender-surface",
+                      "setAndroidNativeWindow old=%p new=%p",
+                      (void *)native_window_,
+                      (void *)native_window);
   native_window_ = native_window;
   android_surface_dirty_ = true;
   return GHOST_kSuccess;
@@ -1995,6 +2005,12 @@ GHOST_TSuccess GHOST_ContextVK::setAndroidNativeWindow(ANativeWindow *native_win
 
 void GHOST_ContextVK::applyAndroidSurfaceChange()
 {
+  __android_log_print(ANDROID_LOG_INFO,
+                      "blender-surface",
+                      "applyAndroidSurfaceChange window=%p surface=%p swapchain=%p",
+                      (void *)native_window_,
+                      (void *)surface_,
+                      (void *)swapchain_);
   android_surface_dirty_ = false;
   if (!vulkan_instance.has_value() || !vulkan_instance->device.has_value()) {
     return;

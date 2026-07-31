@@ -19,6 +19,7 @@
 #include "GHOST_WindowManager.hh"
 
 #include <android/configuration.h>
+#include <android/log.h>
 #include <android/input.h>
 #include <jni.h>
 #include <android/keycodes.h>
@@ -184,6 +185,11 @@ GHOST_TSuccess GHOST_SystemAndroid::disposeContext(GHOST_IContext *context)
 void GHOST_SystemAndroid::handleNativeWindowInit(android_app *app)
 {
   app_ = app;
+  __android_log_print(ANDROID_LOG_INFO,
+                      "blender-surface",
+                      "INIT_WINDOW window=%p ghost_window=%p",
+                      (void *)app->window,
+                      (void *)window_);
   if (window_ && app->window) {
     window_->setNativeWindow(app->window);
     pushEvent(std::make_unique<GHOST_Event>(getMilliSeconds(), GHOST_kEventWindowSize, window_));
@@ -196,6 +202,8 @@ void GHOST_SystemAndroid::handleNativeWindowInit(android_app *app)
 
 void GHOST_SystemAndroid::handleNativeWindowTerm()
 {
+  __android_log_print(
+      ANDROID_LOG_INFO, "blender-surface", "TERM_WINDOW ghost_window=%p", (void *)window_);
   if (window_) {
     window_->setNativeWindow(nullptr);
   }
