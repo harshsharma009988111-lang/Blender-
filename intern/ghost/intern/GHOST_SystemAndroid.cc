@@ -34,8 +34,9 @@ static android_app *g_android_app = nullptr;
 
 /* Hold a finger this long without moving to get a right-click. */
 static constexpr uint64_t TOUCH_LONG_PRESS_MS = 500;
-/* Movement past this (in pixels) makes the press a left-button drag. */
-static constexpr int32_t TOUCH_SLOP_PX = 24;
+/* Movement past this (in pixels) makes the press a left-button drag. Sized for a
+ * fingertip on a dense tablet panel, so resting jitter does not cancel a hold. */
+static constexpr int32_t TOUCH_SLOP_PX = 48;
 
 GHOST_SystemAndroid::GHOST_SystemAndroid()
     : app_(g_android_app),
@@ -87,6 +88,9 @@ uint64_t GHOST_SystemAndroid::getMilliSeconds() const
 
 bool GHOST_SystemAndroid::processEvents(bool /*waitForEvent*/)
 {
+  /* Soft-keyboard input arrives on the Android UI thread; dispatch it here. */
+  drainJavaInput();
+
   /* A finger held still emits no events, so the long-press is timed here. */
   touchLongPressCheck();
 
@@ -238,8 +242,10 @@ int32_t GHOST_SystemAndroid::handleMotionEvent(AInputEvent *event)
   const int32_t action = AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
   const size_t count = AMotionEvent_getPointerCount(event);
 
-  /* Two fingers: pan -> scroll, distance change -> magnify. */
+  /* Two fingers: pan -> scroll, distance change -> magnify. A gesture is never a
+   * click, so drop any press still waiting to be classified. */
   if (count >= 2) {
+    touchCancelPending();
     const float x0 = AMotionEvent_getX(event, 0), y0 = AMotionEvent_getY(event, 0);
     const float x1 = AMotionEvent_getX(event, 1), y1 = AMotionEvent_getY(event, 1);
     const float cx = (x0 + x1) * 0.5f, cy = (y0 + y1) * 0.5f;
@@ -365,6 +371,14 @@ void GHOST_SystemAndroid::touchLongPressCheck()
   touchSendButton(GHOST_kButtonMaskRight, GHOST_kEventButtonDown);
 }
 
+void GHOST_SystemAndroid::touchCancelPending()
+{
+  touch_pending_ = false;
+  if (touch_button_down_) {
+    touchSendButton(touch_button_, GHOST_kEventButtonUp);
+  }
+}
+
 static GHOST_TKey convertAndroidKey(int32_t keycode)
 {
   if (keycode >= AKEYCODE_A && keycode <= AKEYCODE_Z) {
@@ -434,6 +448,41 @@ static int utf8_char_len(unsigned char lead)
 
 void GHOST_SystemAndroid::handleTextInput(const char *utf8_string)
 {
+  if (!utf8_string) {
+    return;
+  }
+  std::scoped_lock lock(java_input_mutex_);
+  java_text_.push_back(utf8_string);
+}
+
+void GHOST_SystemAndroid::handleJavaKeyEvent(int32_t keycode, int32_t action, int32_t meta_state)
+{
+  std::scoped_lock lock(java_input_mutex_);
+  java_keys_.push_back({keycode, action, meta_state});
+}
+
+void GHOST_SystemAndroid::drainJavaInput()
+{
+  std::vector<std::string> text;
+  std::vector<JavaKeyEvent> keys;
+  {
+    std::scoped_lock lock(java_input_mutex_);
+    if (java_text_.empty() && java_keys_.empty()) {
+      return;
+    }
+    text.swap(java_text_);
+    keys.swap(java_keys_);
+  }
+  for (const std::string &string : text) {
+    dispatchTextInput(string.c_str());
+  }
+  for (const JavaKeyEvent &key : keys) {
+    dispatchJavaKeyEvent(key.keycode, key.action, key.meta_state);
+  }
+}
+
+void GHOST_SystemAndroid::dispatchTextInput(const char *utf8_string)
+{
   if (!window_ || !utf8_string) {
     return;
   }
@@ -466,7 +515,7 @@ void GHOST_SystemAndroid::handleTextInput(const char *utf8_string)
   }
 }
 
-void GHOST_SystemAndroid::handleJavaKeyEvent(int32_t keycode, int32_t action, int32_t meta_state)
+void GHOST_SystemAndroid::dispatchJavaKeyEvent(int32_t keycode, int32_t action, int32_t meta_state)
 {
   if (!window_) {
     return;

@@ -12,6 +12,10 @@
 #include "GHOST_Buttons.hh"
 #include "GHOST_System.hh"
 
+#include <mutex>
+#include <string>
+#include <vector>
+
 struct android_app;
 struct AInputEvent;
 class GHOST_WindowAndroid;
@@ -106,9 +110,23 @@ class GHOST_SystemAndroid : public GHOST_System {
    * becomes a right-click while moving or a quick tap stays a left-click. */
   void touchLongPressCheck();
   void touchSendButton(GHOST_TButton mask, GHOST_TEventType type);
-  bool touch_pending_;              /* Finger down, button not decided yet. */
-  bool touch_button_down_;          /* A button was emitted and is still held. */
+  void touchCancelPending();
+  bool touch_pending_;          /* Finger down, button not decided yet. */
+  bool touch_button_down_;      /* A button was emitted and is still held. */
   GHOST_TButton touch_button_;  /* Which button was emitted. */
   uint64_t touch_down_time_;
   int32_t touch_down_x_, touch_down_y_;
+
+  /* The Java IME callbacks run on the Android UI thread, while the event queue
+   * is only safe to touch from Blender's thread, so they are queued and drained
+   * in processEvents(). */
+  struct JavaKeyEvent {
+    int32_t keycode, action, meta_state;
+  };
+  void drainJavaInput();
+  void dispatchTextInput(const char *utf8_string);
+  void dispatchJavaKeyEvent(int32_t keycode, int32_t action, int32_t meta_state);
+  std::mutex java_input_mutex_;
+  std::vector<std::string> java_text_;
+  std::vector<JavaKeyEvent> java_keys_;
 };
