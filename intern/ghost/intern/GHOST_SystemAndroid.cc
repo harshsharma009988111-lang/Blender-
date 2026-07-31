@@ -76,8 +76,10 @@ uint64_t GHOST_SystemAndroid::getMilliSeconds() const
 
 bool GHOST_SystemAndroid::processEvents(bool /*waitForEvent*/)
 {
-  /* Input arrives asynchronously via the glue calling handleInputEvent(). */
-  return false;
+  /* Input arrives asynchronously via the glue calling handleInputEvent(), which
+   * queues GHOST events. Report whether any are pending so the window manager
+   * actually dispatches them (it only calls dispatchEvents() when this is true). */
+  return getEventManager()->getNumEvents() != 0;
 }
 
 uint8_t GHOST_SystemAndroid::getNumDisplays() const
