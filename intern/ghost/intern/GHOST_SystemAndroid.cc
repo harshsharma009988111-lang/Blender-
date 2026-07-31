@@ -32,6 +32,11 @@
 
 static android_app *g_android_app = nullptr;
 
+/* Hold a finger this long without moving to get a right-click. */
+static constexpr uint64_t TOUCH_LONG_PRESS_MS = 500;
+/* Movement past this (in pixels) makes the press a left-button drag. */
+static constexpr int32_t TOUCH_SLOP_PX = 24;
+
 GHOST_SystemAndroid::GHOST_SystemAndroid()
     : app_(g_android_app),
       window_(nullptr),
@@ -42,7 +47,13 @@ GHOST_SystemAndroid::GHOST_SystemAndroid()
       gesture_active_(false),
       gesture_prev_x_(0.0f),
       gesture_prev_y_(0.0f),
-      gesture_prev_dist_(0.0f)
+      gesture_prev_dist_(0.0f),
+      touch_pending_(false),
+      touch_button_down_(false),
+      touch_button_(GHOST_kButtonMaskLeft),
+      touch_down_time_(0),
+      touch_down_x_(0),
+      touch_down_y_(0)
 {
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -76,6 +87,9 @@ uint64_t GHOST_SystemAndroid::getMilliSeconds() const
 
 bool GHOST_SystemAndroid::processEvents(bool /*waitForEvent*/)
 {
+  /* A finger held still emits no events, so the long-press is timed here. */
+  touchLongPressCheck();
+
   /* Input arrives asynchronously via the glue calling handleInputEvent(), which
    * queues GHOST events. Report whether any are pending so the window manager
    * actually dispatches them (it only calls dispatchEvents() when this is true). */
@@ -281,22 +295,69 @@ int32_t GHOST_SystemAndroid::handleMotionEvent(AInputEvent *event)
         tablet));
   }
 
-  /* Tip contact is the left button. */
+  /* A stylus has its own buttons, so its tip maps straight to the left button.
+   * A finger cannot express a right-click, so the button is chosen from how long
+   * the press is held (see touchLongPressCheck). */
+  const bool is_stylus = tablet.Active != GHOST_kTabletModeNone;
+
   switch (action) {
     case AMOTION_EVENT_ACTION_DOWN:
-      buttons_.set(GHOST_kButtonMaskLeft, true);
-      pushEvent(std::make_unique<GHOST_EventButton>(
-          getMilliSeconds(), GHOST_kEventButtonDown, window_, GHOST_kButtonMaskLeft, tablet));
+      if (is_stylus) {
+        touchSendButton(GHOST_kButtonMaskLeft, GHOST_kEventButtonDown);
+      }
+      else {
+        touch_pending_ = true;
+        touch_down_time_ = getMilliSeconds();
+        touch_down_x_ = x;
+        touch_down_y_ = y;
+      }
       return 1;
+
+    case AMOTION_EVENT_ACTION_MOVE:
+      /* Moving past the slop means a drag, which is always the left button. */
+      if (touch_pending_ && (abs(x - touch_down_x_) > TOUCH_SLOP_PX ||
+                             abs(y - touch_down_y_) > TOUCH_SLOP_PX))
+      {
+        touch_pending_ = false;
+        touchSendButton(GHOST_kButtonMaskLeft, GHOST_kEventButtonDown);
+      }
+      return 1;
+
     case AMOTION_EVENT_ACTION_UP:
     case AMOTION_EVENT_ACTION_CANCEL:
-      buttons_.set(GHOST_kButtonMaskLeft, false);
-      pushEvent(std::make_unique<GHOST_EventButton>(
-          getMilliSeconds(), GHOST_kEventButtonUp, window_, GHOST_kButtonMaskLeft, tablet));
+      /* Released before the long-press elapsed: a plain tap, press and release. */
+      if (touch_pending_) {
+        touch_pending_ = false;
+        touchSendButton(GHOST_kButtonMaskLeft, GHOST_kEventButtonDown);
+      }
+      if (touch_button_down_) {
+        touchSendButton(touch_button_, GHOST_kEventButtonUp);
+      }
       return 1;
+
     default:
       return 1;
   }
+}
+
+void GHOST_SystemAndroid::touchSendButton(GHOST_TButton mask, GHOST_TEventType type)
+{
+  const bool down = type == GHOST_kEventButtonDown;
+  buttons_.set(mask, down);
+  touch_button_ = mask;
+  touch_button_down_ = down;
+  pushEvent(std::make_unique<GHOST_EventButton>(
+      getMilliSeconds(), type, window_, mask, GHOST_TABLET_DATA_NONE));
+}
+
+void GHOST_SystemAndroid::touchLongPressCheck()
+{
+  if (!touch_pending_ || getMilliSeconds() - touch_down_time_ < TOUCH_LONG_PRESS_MS) {
+    return;
+  }
+  /* Held in place long enough: emit a right-click instead. */
+  touch_pending_ = false;
+  touchSendButton(GHOST_kButtonMaskRight, GHOST_kEventButtonDown);
 }
 
 static GHOST_TKey convertAndroidKey(int32_t keycode)

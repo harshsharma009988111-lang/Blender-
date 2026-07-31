@@ -101,4 +101,14 @@ class GHOST_SystemAndroid : public GHOST_System {
   /* Two-finger gesture tracking (pan/pinch), computed from raw pointers. */
   bool gesture_active_;
   float gesture_prev_x_, gesture_prev_y_, gesture_prev_dist_;
+
+  /* Finger touch: the button is decided after the press, so that holding still
+   * becomes a right-click while moving or a quick tap stays a left-click. */
+  void touchLongPressCheck();
+  void touchSendButton(GHOST_TButton mask, GHOST_TEventType type);
+  bool touch_pending_;              /* Finger down, button not decided yet. */
+  bool touch_button_down_;          /* A button was emitted and is still held. */
+  GHOST_TButton touch_button_;  /* Which button was emitted. */
+  uint64_t touch_down_time_;
+  int32_t touch_down_x_, touch_down_y_;
 };
