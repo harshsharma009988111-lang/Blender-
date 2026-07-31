@@ -696,6 +696,15 @@ void VKFrameBuffer::rendering_ensure_dynamic_rendering(VKContext &context,
     GPUAttachmentState attachment_state = attachment_states_[GPU_FB_DEPTH_ATTACHMENT];
     VkImageView depth_image_view = VK_NULL_HANDLE;
     if (attachment_state == GPU_ATTACHMENT_WRITE) {
+      /* Dynamic rendering binds depth and stencil as separate attachments, each with a
+       * single-aspect view. Classic render passes (the fallback) use one depth/stencil
+       * attachment, whose view must cover both aspects of a combined format. */
+      const VkImageAspectFlags vk_aspect =
+          (!extensions.dynamic_rendering && is_depth_stencil_attachment) ?
+              static_cast<VkImageAspectFlags>(VK_IMAGE_ASPECT_DEPTH_BIT |
+                                              VK_IMAGE_ASPECT_STENCIL_BIT) :
+          is_stencil_attachment ? static_cast<VkImageAspectFlags>(VK_IMAGE_ASPECT_STENCIL_BIT) :
+                                  static_cast<VkImageAspectFlags>(VK_IMAGE_ASPECT_DEPTH_BIT);
       VKImageViewInfo image_view_info = {
           eImageViewUsage::Attachment,
           IndexRange(max_ii(attachment.layer, 0), 1),
@@ -703,8 +712,7 @@ void VKFrameBuffer::rendering_ensure_dynamic_rendering(VKContext &context,
           {{'r', 'g', 'b', 'a'}},
           VKImageViewArrayed::DONT_CARE,
           to_vk_format(depth_texture.device_format_get()),
-          is_stencil_attachment ? static_cast<VkImageAspectFlags>(VK_IMAGE_ASPECT_STENCIL_BIT) :
-                                  static_cast<VkImageAspectFlags>(VK_IMAGE_ASPECT_DEPTH_BIT)};
+          vk_aspect};
       depth_image_view = depth_texture.image_view_get(image_view_info).vk_handle();
     }
     VkFormat vk_format = (!extensions.dynamic_rendering_unused_attachments &&
