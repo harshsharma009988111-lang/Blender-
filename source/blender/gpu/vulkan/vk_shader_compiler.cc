@@ -14,6 +14,8 @@
 #  include "BLI_winstuff.hh"
 #endif
 
+#include "vk_backend.hh"
+#include "vk_device.hh"
 #include "vk_shader.hh"
 #include "vk_shader_compiler.hh"
 
@@ -33,7 +35,12 @@ static std::optional<std::string> cache_dir_get()
     /* Shader builder doesn't return the correct appdir. */
     BKE_appdir_folder_caches(tmp_dir_buffer, sizeof(tmp_dir_buffer));
 
-    std::string cache_dir = std::string(tmp_dir_buffer) + "vk-spirv-cache" + SEP_STR;
+    /* Version the cache by the device Vulkan version: the target SPIR-V version
+     * depends on it, and the source hash alone would otherwise reuse SPIR-V
+     * compiled for a different target (e.g. 1.5 on a 1.1 device). */
+    const uint32_t api = VKBackend::get().device.physical_device_properties_get().apiVersion;
+    const char *ver = (api < VK_API_VERSION_1_2) ? "vk11" : "vk12";
+    std::string cache_dir = std::string(tmp_dir_buffer) + "vk-spirv-cache-" + ver + SEP_STR;
     BLI_dir_create_recursive(cache_dir.c_str());
     return cache_dir;
   }();
@@ -208,7 +215,15 @@ static bool compile_ex(shaderc::Compiler &compiler,
 
   shaderc::CompileOptions options;
   bool do_optimize = true;
-  options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_2);
+  /* Target the device's Vulkan version so the generated SPIR-V is accepted.
+   * Vulkan 1.2 emits SPIR-V 1.5; a Vulkan 1.1 device (e.g. Adreno 642L) only
+   * accepts SPIR-V 1.3, so compile for Vulkan 1.1 there. */
+  const uint32_t api_version =
+      VKBackend::get().device.physical_device_properties_get().apiVersion;
+  const shaderc_env_version env_version = (api_version < VK_API_VERSION_1_2) ?
+                                              shaderc_env_version_vulkan_1_1 :
+                                              shaderc_env_version_vulkan_1_2;
+  options.SetTargetEnvironment(shaderc_target_env_vulkan, env_version);
   if (G.debug & G_DEBUG_GPU_RENDERDOC) {
     do_optimize = false;
   }
