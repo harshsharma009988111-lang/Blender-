@@ -116,6 +116,15 @@ class VKRenderPassFallback {
    * view handle can't match a stale cached framebuffer.
    */
   void discard_framebuffers_for_view(VkImageView vk_image_view, VKDiscardPool &pool);
+
+  int64_t render_pass_count() const
+  {
+    return render_passes_.size();
+  }
+  int64_t framebuffer_count() const
+  {
+    return framebuffers_.size();
+  }
 };
 
 }  // namespace blender::gpu

@@ -18,6 +18,10 @@
 
 #include "BLI_vector.hh"
 
+#ifdef __ANDROID__
+#  include <android/log.h>
+#endif
+
 namespace blender::gpu {
 
 VkRenderPass VKRenderPassFallback::render_pass_from_key(const RenderPassKey &key)
@@ -254,6 +258,19 @@ void begin_rendering_fallback(VKCommandBufferInterface &command_buffer,
   VKRenderPassFallback &fallback = VKBackend::get().device.render_pass_fallback;
   VkRenderPass vk_render_pass = fallback.render_pass_get(data);
   VkFramebuffer vk_framebuffer = fallback.framebuffer_get(vk_render_pass, data);
+#ifdef __ANDROID__
+  {
+    static int counter = 0;
+    if ((counter++ % 50) == 0) {
+      __android_log_print(ANDROID_LOG_INFO,
+                          "blender-rpfb",
+                          "caches: render_passes=%d framebuffers=%d (begin #%d)",
+                          int(fallback.render_pass_count()),
+                          int(fallback.framebuffer_count()),
+                          counter);
+    }
+  }
+#endif
 
   /* Clear values in the same order as the render pass attachments: real color
    * attachments first, then depth/stencil. */

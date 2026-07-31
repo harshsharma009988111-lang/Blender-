@@ -21,6 +21,14 @@
 #include "WM_api.hh"
 #include "wm_window.hh"
 
+#ifdef __ANDROID__
+#  include <android/log.h>
+#  include <pthread.h>
+#  define DRWLOG(...) __android_log_print(ANDROID_LOG_INFO, "blender-drwlock", __VA_ARGS__)
+#else
+#  define DRWLOG(...) ((void)0)
+#endif
+
 namespace blender {
 
 /* -------------------------------------------------------------------- */
@@ -47,13 +55,16 @@ void DRW_mutexes_exit()
 
 void DRW_lock_start()
 {
+  DRWLOG("lock_start enter tid=%lx", (unsigned long)pthread_self());
   bool locked = BLI_ticket_mutex_lock_check_recursive(draw_mutex);
+  DRWLOG("lock_start done tid=%lx locked=%d", (unsigned long)pthread_self(), int(locked));
   BLI_assert(locked);
   UNUSED_VARS_NDEBUG(locked);
 }
 
 void DRW_lock_end()
 {
+  DRWLOG("lock_end tid=%lx", (unsigned long)pthread_self());
   BLI_ticket_mutex_unlock(draw_mutex);
 }
 

@@ -13,6 +13,10 @@
 
 #include "CLG_log.h"
 
+#ifdef __ANDROID__
+#  include <android/log.h>
+#endif
+
 namespace blender {
 
 static CLG_LogRef LOG = {"gpu.vulkan"};
@@ -100,6 +104,13 @@ bool VKBuffer::create(size_t size_in_bytes,
   VkResult result = vmaCreateBuffer(
       allocator, &create_info, &vma_create_info, &resource_.vk_handle, &allocation_, nullptr);
   if (result != VK_SUCCESS) {
+#ifdef __ANDROID__
+    __android_log_print(ANDROID_LOG_ERROR,
+                        "blender-vkalloc",
+                        "vmaCreateBuffer FAILED res=%d size=%llu",
+                        int(result),
+                        (unsigned long long)create_info.size);
+#endif
     allocation_failed_ = true;
     size_in_bytes_ = 0;
     alloc_size_in_bytes_ = 0;

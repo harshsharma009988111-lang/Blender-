@@ -27,6 +27,10 @@
 
 #include "BKE_global.hh"
 
+#ifdef __ANDROID__
+#  include <android/log.h>
+#endif
+
 namespace blender::gpu {
 
 static VkImageAspectFlags to_vk_image_aspect_single_bit(const VkImageAspectFlags format,
@@ -765,6 +769,15 @@ bool VKTexture::allocate()
                           &allocation_,
                           &allocation_info_);
   if (result != VK_SUCCESS) {
+#ifdef __ANDROID__
+    __android_log_print(ANDROID_LOG_ERROR,
+                        "blender-vkalloc",
+                        "vmaCreateImage FAILED res=%d name=%s %ux%u",
+                        int(result),
+                        name_.c_str(),
+                        image_info.extent.width,
+                        image_info.extent.height);
+#endif
     return false;
   }
   debug::object_label(vk_image_, name_.c_str());
