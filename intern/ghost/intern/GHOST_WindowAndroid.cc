@@ -57,6 +57,14 @@ void GHOST_WindowAndroid::setNativeWindow(ANativeWindow *native_window)
   if (native_window_) {
     ANativeWindow_acquire(native_window_);
   }
+
+#ifdef WITH_VULKAN_BACKEND
+  /* Rebuild the Vulkan surface/swapchain for the replaced native window, else we
+   * keep presenting to a dead surface (black screen after doze/wake or rotation). */
+  if (GHOST_ContextVK *context = dynamic_cast<GHOST_ContextVK *>(getContext())) {
+    context->setAndroidNativeWindow(native_window_);
+  }
+#endif
 }
 
 GHOST_Context *GHOST_WindowAndroid::newDrawingContext(GHOST_TDrawingContextType type)

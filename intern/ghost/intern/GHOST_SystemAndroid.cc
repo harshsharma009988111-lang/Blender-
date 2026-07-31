@@ -164,6 +164,10 @@ void GHOST_SystemAndroid::handleNativeWindowInit(android_app *app)
   if (window_ && app->window) {
     window_->setNativeWindow(app->window);
     pushEvent(std::make_unique<GHOST_Event>(getMilliSeconds(), GHOST_kEventWindowSize, window_));
+    /* The window dimensions are unchanged across a background/foreground cycle, so
+     * a size event alone schedules no redraw. Force an update so the reborn surface
+     * is actually painted (else the window stays black after app switch). */
+    pushEvent(std::make_unique<GHOST_Event>(getMilliSeconds(), GHOST_kEventWindowUpdate, window_));
   }
 }
 
