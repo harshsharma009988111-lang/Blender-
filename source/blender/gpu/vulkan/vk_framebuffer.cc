@@ -6,6 +6,8 @@
  * \ingroup gpu
  */
 
+#include <algorithm>
+
 #include "vk_framebuffer.hh"
 #include "vk_backend.hh"
 #include "vk_context.hh"
@@ -71,13 +73,19 @@ void VKFrameBuffer::bind(bool enabled_srgb)
 
 uint32_t VKFrameBuffer::viewport_size() const
 {
-  return this->multi_viewport_ ? GPU_MAX_VIEWPORTS : 1;
+  if (!this->multi_viewport_) {
+    return 1;
+  }
+  /* Exceeding maxViewports is invalid and faults the GPU rather than being ignored. */
+  const VKDevice &device = VKBackend::get().device;
+  return std::min(uint32_t(GPU_MAX_VIEWPORTS),
+                  device.physical_device_properties_get().limits.maxViewports);
 }
 
 void VKFrameBuffer::vk_viewports_append(Vector<VkViewport, GPU_MAX_VIEWPORTS> &r_viewports) const
 {
   BLI_assert(r_viewports.is_empty());
-  for (int64_t index : IndexRange(this->multi_viewport_ ? GPU_MAX_VIEWPORTS : 1)) {
+  for (int64_t index : IndexRange(this->viewport_size())) {
     VkViewport viewport;
     viewport.x = viewport_[index][0];
     viewport.y = viewport_[index][1];
@@ -121,7 +129,7 @@ void VKFrameBuffer::vk_render_areas_append(
   BLI_assert(r_render_areas.is_empty());
   VkRect2D render_area;
   render_area_update(render_area);
-  r_render_areas.append_n_times(render_area, this->multi_viewport_ ? GPU_MAX_VIEWPORTS : 1);
+  r_render_areas.append_n_times(render_area, this->viewport_size());
 }
 
 bool VKFrameBuffer::check(char /*err_out*/[256])
