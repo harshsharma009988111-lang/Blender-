@@ -243,7 +243,11 @@ static void vk_restrict_loader_layers()
 
 static bool vk_instance_create_for_platform_checks(VkInstance *r_instance)
 {
+#ifndef __ANDROID__
+  /* TEMP diagnostic: on Android this disables the GraphicsEnvironment-injected
+   * validation layer; skip so we can capture validation output. */
   vk_restrict_loader_layers();
+#endif
 
   VkResult vk_result = volkInitialize();
   if (vk_result != VK_SUCCESS) {
