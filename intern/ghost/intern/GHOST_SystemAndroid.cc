@@ -9,6 +9,8 @@
 #include "GHOST_SystemAndroid.hh"
 #include "GHOST_WindowAndroid.hh"
 
+#include "GHOST_AndroidMemoryTier.hh"
+
 #include "GHOST_ContextVK.hh"
 #include "GHOST_Event.hh"
 #include "GHOST_EventButton.hh"
@@ -109,8 +111,10 @@ uint8_t GHOST_SystemAndroid::getNumDisplays() const
 void GHOST_SystemAndroid::getMainDisplayDimensions(uint32_t &width, uint32_t &height) const
 {
   if (app_ && app_->window) {
-    width = ANativeWindow_getWidth(app_->window);
-    height = ANativeWindow_getHeight(app_->window);
+    /* Report the size Blender renders at, which the render scale may have reduced. */
+    const uint32_t divisor = GHOST_android_render_scale_divisor();
+    width = uint32_t(ANativeWindow_getWidth(app_->window)) / divisor;
+    height = uint32_t(ANativeWindow_getHeight(app_->window)) / divisor;
   }
   else {
     width = height = 0;
@@ -254,8 +258,10 @@ int32_t GHOST_SystemAndroid::handleMotionEvent(AInputEvent *event)
    * click, so drop any press still waiting to be classified. */
   if (count >= 2) {
     touchCancelPending();
-    const float x0 = AMotionEvent_getX(event, 0), y0 = AMotionEvent_getY(event, 0);
-    const float x1 = AMotionEvent_getX(event, 1), y1 = AMotionEvent_getY(event, 1);
+    const float x0 = ghost_android_scale_input(AMotionEvent_getX(event, 0)),
+                y0 = ghost_android_scale_input(AMotionEvent_getY(event, 0));
+    const float x1 = ghost_android_scale_input(AMotionEvent_getX(event, 1)),
+                y1 = ghost_android_scale_input(AMotionEvent_getY(event, 1));
     const float cx = (x0 + x1) * 0.5f, cy = (y0 + y1) * 0.5f;
     const float dist = std::hypot(x1 - x0, y1 - y0);
 
@@ -292,8 +298,8 @@ int32_t GHOST_SystemAndroid::handleMotionEvent(AInputEvent *event)
   const bool hover_exit = action == AMOTION_EVENT_ACTION_HOVER_EXIT;
   const GHOST_TabletData tablet = hover_exit ? GHOST_TABLET_DATA_NONE :
                                               tablet_from_event(event);
-  const int32_t x = int32_t(AMotionEvent_getX(event, 0));
-  const int32_t y = int32_t(AMotionEvent_getY(event, 0));
+  const int32_t x = int32_t(ghost_android_scale_input(AMotionEvent_getX(event, 0)));
+  const int32_t y = int32_t(ghost_android_scale_input(AMotionEvent_getY(event, 0)));
   meta_state_ = AMotionEvent_getMetaState(event);
   cursor_x_ = x;
   cursor_y_ = y;
@@ -677,15 +683,18 @@ GHOST_TSuccess GHOST_SystemAndroid::setCursorPosition(int32_t /*x*/, int32_t /*y
 
 uint16_t GHOST_SystemAndroid::getDPIHint()
 {
+  /* Fewer pixels for the same physical screen means a proportionally lower density, else the
+   * UI would be drawn at twice its intended physical size. */
+  const uint32_t divisor = GHOST_android_render_scale_divisor();
   if (app_ && app_->config) {
     const int32_t density = AConfiguration_getDensity(app_->config);
     if (density > 0 && density != ACONFIGURATION_DENSITY_NONE &&
         density != ACONFIGURATION_DENSITY_ANY)
     {
-      return uint16_t(density);
+      return uint16_t(uint32_t(density) / divisor);
     }
   }
-  return 160;
+  return uint16_t(160 / divisor);
 }
 
 /* Call a no-arg void method on the BlenderActivity instance. */

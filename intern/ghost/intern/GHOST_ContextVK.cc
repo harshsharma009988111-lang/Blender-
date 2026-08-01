@@ -31,6 +31,7 @@
 #include "GHOST_Types.hh"
 
 #ifdef __ANDROID__
+#  include "GHOST_AndroidMemoryTier.hh"
 #  include <android/log.h>
 #endif
 
@@ -1333,16 +1334,20 @@ static GHOST_TSuccess selectPresentMode(const GHOST_TVSyncModes vsync,
   /* TODO: select the correct presentation mode based on the actual being performed by the user.
    * When low latency is required (paint cursor) we should select mailbox, otherwise we can do FIFO
    * to reduce CPU/GPU usage. */
-#ifndef __ANDROID__
-  /* On Android MAILBOX costs a third full-screen swapchain image (~16MB at 2560x1600) on
-   * devices that are already memory constrained, so prefer FIFO and double buffering. */
-  for (const VkPresentModeKHR present_mode : presents) {
-    if (present_mode == VK_PRESENT_MODE_MAILBOX_KHR) {
-      *r_presentMode = present_mode;
-      return GHOST_kSuccess;
+#ifdef __ANDROID__
+  /* MAILBOX needs a third full-screen swapchain image; skip it only where memory is tight. */
+  const bool prefer_double_buffering = GHOST_android_is_low_memory_device();
+#else
+  const bool prefer_double_buffering = false;
+#endif
+  if (!prefer_double_buffering) {
+    for (const VkPresentModeKHR present_mode : presents) {
+      if (present_mode == VK_PRESENT_MODE_MAILBOX_KHR) {
+        *r_presentMode = present_mode;
+        return GHOST_kSuccess;
+      }
     }
   }
-#endif
 
   /* FIFO present mode is always available and we (should) prefer it as it will keep the main loop
    * running along the monitor refresh rate. Mailbox and FIFO relaxed can generate a lot of frames

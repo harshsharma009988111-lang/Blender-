@@ -13,7 +13,39 @@
 #  include "GHOST_ContextVK.hh"
 #endif
 
+#include "GHOST_AndroidMemoryTier.hh"
+
+#include <android/log.h>
 #include <android/native_window.h>
+
+/**
+ * Shrink the buffers the window renders into; the display scales them back up. Every render
+ * target follows the window size, so this cuts GPU memory by the square of the divisor.
+ */
+static void ghost_android_apply_render_scale(ANativeWindow *native_window)
+{
+  const uint32_t divisor = GHOST_android_render_scale_divisor();
+  if (native_window == nullptr || divisor <= 1) {
+    return;
+  }
+  const int32_t native_w = ANativeWindow_getWidth(native_window);
+  const int32_t native_h = ANativeWindow_getHeight(native_window);
+  if (native_w <= 0 || native_h <= 0) {
+    return;
+  }
+  const int32_t w = std::max(1, native_w / int32_t(divisor));
+  const int32_t h = std::max(1, native_h / int32_t(divisor));
+  /* Format 0 keeps the window's current pixel format. */
+  ANativeWindow_setBuffersGeometry(native_window, w, h, 0);
+  __android_log_print(ANDROID_LOG_INFO,
+                      "blender-renderscale",
+                      "native=%dx%d -> buffers=%dx%d (divisor=%u)",
+                      native_w,
+                      native_h,
+                      w,
+                      h,
+                      divisor);
+}
 
 GHOST_WindowAndroid::GHOST_WindowAndroid(GHOST_SystemAndroid *system,
                                          ANativeWindow *native_window,
@@ -30,6 +62,7 @@ GHOST_WindowAndroid::GHOST_WindowAndroid(GHOST_SystemAndroid *system,
 {
   if (native_window_) {
     ANativeWindow_acquire(native_window_);
+    ghost_android_apply_render_scale(native_window_);
   }
   setDrawingContextType(type);
 }
@@ -56,6 +89,7 @@ void GHOST_WindowAndroid::setNativeWindow(ANativeWindow *native_window)
   native_window_ = native_window;
   if (native_window_) {
     ANativeWindow_acquire(native_window_);
+    ghost_android_apply_render_scale(native_window_);
   }
 
 #ifdef WITH_VULKAN_BACKEND
@@ -91,8 +125,12 @@ void GHOST_WindowAndroid::getWindowBounds(GHOST_Rect &bounds) const
 
 void GHOST_WindowAndroid::getClientBounds(GHOST_Rect &bounds) const
 {
-  const int32_t w = native_window_ ? ANativeWindow_getWidth(native_window_) : 0;
-  const int32_t h = native_window_ ? ANativeWindow_getHeight(native_window_) : 0;
+  /* ANativeWindow_getWidth/Height report the display size, not the (possibly reduced)
+   * buffer size, so apply the same divisor used for the buffer geometry. */
+  const uint32_t divisor = GHOST_android_render_scale_divisor();
+  const int32_t w = native_window_ ? ANativeWindow_getWidth(native_window_) / int32_t(divisor) : 0;
+  const int32_t h = native_window_ ? ANativeWindow_getHeight(native_window_) / int32_t(divisor) :
+                                     0;
   bounds.set(0, 0, w, h);
 }
 
