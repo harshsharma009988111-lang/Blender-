@@ -431,6 +431,18 @@ class VKDevice : public NonCopyable {
   void wait_queue_idle();
 
   /**
+   * Set when the device is lost: either a submission returned VK_ERROR_DEVICE_LOST, or the
+   * timeline stopped advancing (a wedged GPU is not always reported as device lost). Neither
+   * recovers, so waits and submissions bail out instead of blocking forever while holding the
+   * draw lock, which would otherwise hang the app until the watchdog kills it.
+   */
+  std::atomic<bool> device_lost_ = false;
+  bool is_device_lost() const
+  {
+    return device_lost_.load(std::memory_order_relaxed);
+  }
+
+  /**
    * Retrieve the last finished submission timeline.
    */
   TimelineValue submission_finished_timeline_get() const
