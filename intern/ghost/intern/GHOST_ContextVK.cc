@@ -1333,12 +1333,16 @@ static GHOST_TSuccess selectPresentMode(const GHOST_TVSyncModes vsync,
   /* TODO: select the correct presentation mode based on the actual being performed by the user.
    * When low latency is required (paint cursor) we should select mailbox, otherwise we can do FIFO
    * to reduce CPU/GPU usage. */
+#ifndef __ANDROID__
+  /* On Android MAILBOX costs a third full-screen swapchain image (~16MB at 2560x1600) on
+   * devices that are already memory constrained, so prefer FIFO and double buffering. */
   for (const VkPresentModeKHR present_mode : presents) {
     if (present_mode == VK_PRESENT_MODE_MAILBOX_KHR) {
       *r_presentMode = present_mode;
       return GHOST_kSuccess;
     }
   }
+#endif
 
   /* FIFO present mode is always available and we (should) prefer it as it will keep the main loop
    * running along the monitor refresh rate. Mailbox and FIFO relaxed can generate a lot of frames
@@ -1639,6 +1643,18 @@ GHOST_TSuccess GHOST_ContextVK::recreateSwapchain(bool use_hdr_swapchain)
              actual_image_count,
              uint64_t(swapchain_),
              uint64_t(old_swapchain));
+#ifdef __ANDROID__
+  __android_log_print(ANDROID_LOG_INFO,
+                      "blender-swapchain",
+                      "extent=%ux%u present_mode=%s requested=%u acquired=%u min=%u max=%u",
+                      render_extent_.width,
+                      render_extent_.height,
+                      to_string_vk_present_mode(present_mode),
+                      image_count_requested,
+                      actual_image_count,
+                      capabilities.minImageCount,
+                      capabilities.maxImageCount);
+#endif
   /* Construct new semaphores. It can be that image_count is larger than previously. We only need
    * to fill in where the handle is `VK_NULL_HANDLE`. */
   /* Previous handles from the frame data cannot be used and should be discarded. */
