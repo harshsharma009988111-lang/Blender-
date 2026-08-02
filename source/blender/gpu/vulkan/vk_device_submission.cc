@@ -19,6 +19,8 @@
 
 #ifdef __ANDROID__
 #  include <android/log.h>
+#  include <cstdlib>
+#  include <sys/system_properties.h>
 #  define VKSUBLOG(...) __android_log_print(ANDROID_LOG_INFO, "blender-vksubmit", __VA_ARGS__)
 #else
 #  define VKSUBLOG(...) ((void)0)
@@ -314,13 +316,16 @@ void VKDevice::submission_runner(VKDevice *device)
         std::scoped_lock lock_queue(*device->queue_mutex_);
         VkResult submit_result = device->functions.vkQueueSubmit(
             device->vk_queue_, 1, &vk_submit_info, submit_task->signal_fence);
-        VKSUBLOG("submit timeline=%llu nodes=%u wait_sem=%p signal_sem=%p fence=%p res=%d",
-                 (unsigned long long)submit_task->timeline,
-                 uint32_t(submitted_nodes),
-                 (void *)submit_task->wait_semaphore,
-                 (void *)submit_task->signal_semaphore,
-                 (void *)submit_task->signal_fence,
-                 int(submit_result));
+        VKSUBLOG(
+            "submit timeline=%llu nodes=%u waits_for=%llu signalled=%llu wait_sem=%p "
+            "signal_sem=%p res=%d",
+            (unsigned long long)submit_task->timeline,
+            uint32_t(submitted_nodes),
+            (unsigned long long)(submit_task->timeline - 1),
+            (unsigned long long)device->submission_finished_timeline_get(),
+            (void *)submit_task->wait_semaphore,
+            (void *)submit_task->signal_semaphore,
+            int(submit_result));
         if (submit_result == VK_ERROR_DEVICE_LOST) {
           /* The timeline semaphore will never advance again. Latch this so waiters give up
            * instead of blocking forever while holding higher level locks. */
