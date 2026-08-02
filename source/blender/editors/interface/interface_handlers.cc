@@ -2170,6 +2170,13 @@ static void selectcontext_apply(bContext *C,
 
 static bool but_drag_init(bContext *C, Button *but, HandleButtonData *data, const wmEvent *event)
 {
+  /* A release ends the interaction. Starting a drag here would install a handler whose only
+   * exit condition is the release that has just been consumed, leaving it live forever and
+   * toggling every button the cursor later passes over. */
+  if (event->val == KM_RELEASE) {
+    return false;
+  }
+
   /* prevent other WM gestures to start while we try to drag */
   WM_gestures_remove(CTX_wm_window(C));
 
