@@ -218,6 +218,16 @@ build_files/android/build.py --enable-turnip
 build_files/android/build.py --disable-turnip
 ```
 
+The driver itself is not shipped: place a Turnip build at
+`/data/data/org.blender.blender/files/turnip/vulkan.ad07xx.so`. The
+`libadrenotools` hooks are bundled by `package.sh` automatically.
+
+Status on Adreno 642L (as of Aug 2026): loads and renders correctly, and passes
+the colour picker stress test, but crashes inside the driver
+(`vulkan.ad07xx.so`, null dereference reached from command recording) while
+cycling viewport shading modes. Treat it as experimental; the vendor driver is
+the default and passes both suites.
+
 ---
 
 ## On-device debug switches
