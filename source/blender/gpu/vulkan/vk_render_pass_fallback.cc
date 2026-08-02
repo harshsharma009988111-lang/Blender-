@@ -81,7 +81,9 @@ VkRenderPass VKRenderPassFallback::render_pass_from_key(const RenderPassKey &key
      * dependency, so unlike dynamic rendering the render pass isn't synchronized
      * against surrounding commands. Add explicit external dependencies covering
      * the attachment read/write stages so prior writes are visible and results
-     * are flushed (missing sync manifests as a GPU hang on Adreno). */
+     * are flushed (missing sync manifests as a GPU hang on Adreno).
+     * These must not be by-region: the consumers include compute (HiZ downsampling
+     * reads neighbouring texels), which is not a framebuffer-space stage. */
     const VkPipelineStageFlags gfx_stages = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
                                             VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
                                             VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
@@ -96,14 +98,14 @@ VkRenderPass VKRenderPassFallback::render_pass_from_key(const RenderPassKey &key
                gfx_stages,
                VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
                gfx_access,
-               VK_DEPENDENCY_BY_REGION_BIT};
+               0};
     deps[1] = {0,
                VK_SUBPASS_EXTERNAL,
                gfx_stages,
                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                gfx_access,
                VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
-               VK_DEPENDENCY_BY_REGION_BIT};
+               0};
 
     VkRenderPassCreateInfo create_info = {VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
     create_info.attachmentCount = attachment_count;
