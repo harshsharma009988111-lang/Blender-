@@ -9,6 +9,10 @@
  */
 
 #include "BLI_math_matrix.hh"
+
+#ifdef __ANDROID__
+#  include <unistd.h>
+#endif
 #include "GPU_batch_utils.hh"
 #include "GPU_compute.hh"
 
@@ -601,8 +605,22 @@ void ShadowModule::init()
   }
 
   /* Pool size is in MBytes. */
-  const size_t pool_byte_size = enabled_ ? size_t(scene.eevee.shadow_pool_size) * square_i(1024) :
-                                           1;
+  int pool_size_mb = scene.eevee.shadow_pool_size;
+#ifdef __ANDROID__
+  /* The desktop default (512MB) is larger than the whole GPU budget on a phone or tablet, and
+   * is allocated even for a small material preview. Cap it on memory constrained devices. */
+  {
+    const long pages = sysconf(_SC_PHYS_PAGES);
+    const long page_size = sysconf(_SC_PAGE_SIZE);
+    const uint64_t total_bytes = (pages > 0 && page_size > 0) ?
+                                     uint64_t(pages) * uint64_t(page_size) :
+                                     0;
+    if (total_bytes != 0 && total_bytes < (6ull << 30)) {
+      pool_size_mb = min_ii(pool_size_mb, 16);
+    }
+  }
+#endif
+  const size_t pool_byte_size = enabled_ ? size_t(pool_size_mb) * square_i(1024) : 1;
   const size_t page_byte_size = square_i(shadow_page_size_) * sizeof(int);
   shadow_page_len_ = int(divide_ceil_ul(pool_byte_size, page_byte_size));
   shadow_page_len_ = min_ii(shadow_page_len_, SHADOW_MAX_PAGE);
