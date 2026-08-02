@@ -30,6 +30,13 @@ echo "[apk] gathering native libraries"
 cp "$BUILD/lib/libblender.so" "$JNI/"
 cp "$ANDROID_SYSROOT/usr/lib/aarch64-linux-android/libc++_shared.so" "$JNI/"
 
+# libadrenotools loads its hooks by name from the native library directory, so they
+# have to ship in the APK for the Turnip driver path to work.
+if [ -d "$LIBDIR/adrenotools/hooks" ]; then
+  cp "$LIBDIR"/adrenotools/hooks/*.so "$JNI/"
+  echo "[apk] bundled adrenotools hooks (Turnip support)"
+fi
+
 readelf_needed() {
   "$ANDROID_LLVM_BIN/llvm-readelf" -d "$1" 2>/dev/null |
     sed -nE 's/.*\(NEEDED\).*\[(.*)\]/\1/p'
