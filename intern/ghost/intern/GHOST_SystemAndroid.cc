@@ -303,9 +303,17 @@ int32_t GHOST_SystemAndroid::handleMotionEvent(AInputEvent *event)
   const bool hover_exit = action == AMOTION_EVENT_ACTION_HOVER_EXIT;
   const GHOST_TabletData tablet = hover_exit ? GHOST_TABLET_DATA_NONE :
                                               tablet_from_event(event);
-  const int32_t x = int32_t(ghost_android_scale_input(AMotionEvent_getX(event, 0)));
-  const int32_t y = int32_t(ghost_android_scale_input(AMotionEvent_getY(event, 0)));
+  int32_t x = int32_t(ghost_android_scale_input(AMotionEvent_getX(event, 0)));
+  int32_t y = int32_t(ghost_android_scale_input(AMotionEvent_getY(event, 0)));
   meta_state_ = AMotionEvent_getMetaState(event);
+
+  /* A pointer that leaves proximity simply stops sending events, so reporting its last
+   * position keeps the button under it highlighted and its tooltip on screen forever.
+   * Park it outside the window instead, which is what actually happened. Not while a
+   * button is held, so losing range mid-drag doesn't fling the cursor. */
+  if (hover_exit && !touch_button_down_ && !stylus_button_down_) {
+    x = y = -1;
+  }
   cursor_x_ = x;
   cursor_y_ = y;
 
