@@ -1604,7 +1604,21 @@ GHOST_TSuccess GHOST_ContextVK::recreateSwapchain(bool use_hdr_swapchain)
       (capabilities.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) ?
           VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR :
           capabilities.currentTransform;
+  /* OPAQUE is not universally supported (Mesa/Turnip only offers INHERIT), so pick from what
+   * the surface actually advertises, preferring opaque compositing. */
+  const VkCompositeAlphaFlagBitsKHR composite_alpha_preference[] = {
+      VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+      VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
+      VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,
+      VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR,
+  };
   create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+  for (const VkCompositeAlphaFlagBitsKHR composite_alpha : composite_alpha_preference) {
+    if (capabilities.supportedCompositeAlpha & composite_alpha) {
+      create_info.compositeAlpha = composite_alpha;
+      break;
+    }
+  }
   create_info.presentMode = present_mode;
   create_info.clipped = VK_TRUE;
   create_info.oldSwapchain = old_swapchain;
