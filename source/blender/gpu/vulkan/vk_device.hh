@@ -61,6 +61,14 @@ struct VKExtensions {
   bool dynamic_rendering = false;
 
   /**
+   * Does the device support VkPhysicalDeviceFeatures::multiViewport.
+   *
+   * Writing gl_ViewportIndex declares the MultiViewport SPIR-V capability, which is invalid
+   * without it. Mobile GPUs commonly expose a single viewport.
+   */
+  bool multi_viewport = false;
+
+  /**
    * Does the device support VK_KHR_separate_depth_stencil_layouts (core in Vulkan 1.2).
    *
    * When false the depth-only/stencil-only image layouts don't exist and the combined

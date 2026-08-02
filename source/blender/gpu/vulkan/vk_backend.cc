@@ -234,6 +234,7 @@ static Vector<StringRefNull> missing_capabilities_get(VkPhysicalDevice vk_physic
  * Must be called before any `vkCreateInstance` so temporary Vulkan instances created during
  * argument handling (e.g. `--gpu-device help`) don't load implicit layers either.
  */
+#ifndef __ANDROID__
 static void vk_restrict_loader_layers()
 {
   std::stringstream allowed_layers;
@@ -249,6 +250,7 @@ static void vk_restrict_loader_layers()
   BLI_setenv("VK_LOADER_LAYERS_DISABLE", "~implicit~");
   BLI_setenv("VK_LOADER_LAYERS_ALLOW", allowed_layers.str().c_str());
 }
+#endif
 
 #ifdef WITH_ADRENOTOOLS
 /**
@@ -312,8 +314,8 @@ static bool android_try_load_turnip()
 static bool vk_instance_create_for_platform_checks(VkInstance *r_instance)
 {
 #ifndef __ANDROID__
-  /* TEMP diagnostic: on Android this disables the GraphicsEnvironment-injected
-   * validation layer; skip so we can capture validation output. */
+  /* These are desktop loader variables. Android resolves layers through its own loader and
+   * the GraphicsEnvironment injection used to attach validation, which this would suppress. */
   vk_restrict_loader_layers();
 #endif
 
@@ -633,6 +635,7 @@ void VKBackend::detect_workarounds(VKDevice &device)
   extensions.shader_output_viewport_index =
       device.physical_device_vulkan_12_features_get().shaderOutputViewportIndex;
   extensions.wide_lines = device.physical_device_features_get().wideLines;
+  extensions.multi_viewport = device.physical_device_features_get().multiViewport;
   extensions.fragment_shader_barycentric = device.supports_extension(
       VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
   /* Core in Vulkan 1.3 but still advertised as an extension by all current
