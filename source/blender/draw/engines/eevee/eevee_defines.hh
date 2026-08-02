@@ -42,7 +42,10 @@
 #define SPHERE_PROBE_SH_GROUP_SIZE 256
 #define SPHERE_PROBE_SH_SAMPLES_PER_GROUP 64
 /* Must be power of two for correct partitioning. */
-#define SPHERE_PROBE_ATLAS_MAX_SUBDIV 12
+/* 12 (4096px) costs 170MB per atlas, which mobile GPUs cannot spare; 10 (1024px) keeps the
+ * transient spike of a preview render clear of the low memory killer. Shaders share this
+ * header, so it cannot be made conditional on the platform. */
+#define SPHERE_PROBE_ATLAS_MAX_SUBDIV 10
 #define SPHERE_PROBE_ATLAS_RES (1 << SPHERE_PROBE_ATLAS_MAX_SUBDIV)
 /* Maximum number of thread-groups dispatched for remapping a probe to octahedral mapping. */
 #define SPHERE_PROBE_MAX_HARMONIC SQUARE(SPHERE_PROBE_ATLAS_RES / SPHERE_PROBE_REMAP_GROUP_SIZE)
