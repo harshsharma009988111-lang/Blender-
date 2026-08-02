@@ -910,4 +910,21 @@ VkImageUsageFlags to_vk_image_usage(const eGPUTextureUsage usage,
   return result;
 }
 
+VkImageLayout vk_image_layout_supported(VkImageLayout layout)
+{
+  if (VKBackend::get().device.extensions_get().separate_depth_stencil_layouts) {
+    return layout;
+  }
+  switch (layout) {
+    case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL:
+    case VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL:
+      return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL:
+    case VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL:
+      return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+    default:
+      return layout;
+  }
+}
+
 }  // namespace blender::gpu

@@ -22,10 +22,10 @@ static VkImageLayout to_default_image_layout(VkImageAspectFlags aspect, bool use
     if (aspect & VK_IMAGE_ASPECT_STENCIL_BIT) {
       return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     }
-    return VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+    return vk_image_layout_supported(VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
   }
   if (aspect & VK_IMAGE_ASPECT_STENCIL_BIT) {
-    return VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL;
+    return vk_image_layout_supported(VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL);
   }
   return use_local_read ? VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ_KHR :
                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;

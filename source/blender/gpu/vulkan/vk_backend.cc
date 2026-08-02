@@ -641,6 +641,10 @@ void VKBackend::detect_workarounds(VKDevice &device)
    * to stay in lock-step with GHOST_ContextVK device creation. */
   extensions.dynamic_rendering = device.supports_extension(
       VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+  /* Core in Vulkan 1.2, where drivers may stop advertising the extension. */
+  extensions.separate_depth_stencil_layouts =
+      device.physical_device_properties_get().apiVersion >= VK_API_VERSION_1_2 ||
+      device.supports_extension(VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_EXTENSION_NAME);
   extensions.dynamic_rendering_local_read =
       extensions.dynamic_rendering &&
       device.supports_extension(VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME);

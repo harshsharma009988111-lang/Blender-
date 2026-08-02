@@ -700,7 +700,8 @@ void VKFrameBuffer::rendering_ensure_dynamic_rendering(VKContext &context,
                                        VK_IMAGE_ASPECT_STENCIL_BIT;
     VkImageLayout vk_image_layout = is_depth_stencil_attachment ?
                                         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL :
-                                        VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+                                        vk_image_layout_supported(
+                                            VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
     GPUAttachmentState attachment_state = attachment_states_[GPU_FB_DEPTH_ATTACHMENT];
     VkImageView depth_image_view = VK_NULL_HANDLE;
     VkImageView stencil_image_view = VK_NULL_HANDLE;

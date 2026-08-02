@@ -184,6 +184,14 @@ template<typename T> VkObjectType to_vk_object_type(T /*vk_obj*/)
   return VK_OBJECT_TYPE_UNKNOWN;
 }
 
+/**
+ * Collapse the depth-only/stencil-only layouts onto their combined equivalent.
+ *
+ * The separate layouts come from VK_KHR_separate_depth_stencil_layouts (core in Vulkan 1.2) and
+ * don't exist on a Vulkan 1.1 device without it, where using them is undefined behaviour.
+ */
+VkImageLayout vk_image_layout_supported(VkImageLayout layout);
+
 #define NOT_YET_IMPLEMENTED \
   printf("%s:%d `%s` not implemented yet\n", __FILE__, __LINE__, __func__);
 

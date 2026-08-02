@@ -61,6 +61,14 @@ struct VKExtensions {
   bool dynamic_rendering = false;
 
   /**
+   * Does the device support VK_KHR_separate_depth_stencil_layouts (core in Vulkan 1.2).
+   *
+   * When false the depth-only/stencil-only image layouts don't exist and the combined
+   * depth/stencil layouts must be used instead.
+   */
+  bool separate_depth_stencil_layouts = false;
+
+  /**
    * Does the device support VK_KHR_dynamic_rendering_local_read enabled.
    */
   bool dynamic_rendering_local_read = false;
