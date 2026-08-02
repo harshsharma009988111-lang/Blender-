@@ -167,6 +167,7 @@ void remap_cubemap_to_octahedral([[resource_table]] Remap &srt,
     /* Vulkan validation layers detects a data race on `local_radiance[local_index] +=
      * local_radiance[local_index + stride]`. This is a false positive. Even when doing a manual
      * unroll or make the variable `shared coherent` doesn't work around it. */
+    /* 8 = log2(SPHERE_PROBE_REMAP_GROUP_SIZE^2); literal so it can unroll. */
     for (uint i = 0; i < 8; i++) [[unroll]] {
       barrier();
       uint stride = group_size >> (i + 1u);
@@ -192,6 +193,7 @@ void remap_cubemap_to_octahedral([[resource_table]] Remap &srt,
     /* Vulkan validation layers detects a data race on `local_direction[local_index] +=
      * local_direction[local_index + stride]`. This is a false positive. Even when doing a manual
      * unroll or make the variable `shared coherent` doesn't work around it. */
+    /* 8 = log2(SPHERE_PROBE_REMAP_GROUP_SIZE^2); literal so it can unroll. */
     for (uint i = 0; i < 8; i++) [[unroll]] {
       barrier();
       uint stride = group_size >> (i + 1u);
@@ -216,6 +218,7 @@ void remap_cubemap_to_octahedral([[resource_table]] Remap &srt,
     /* Vulkan validation layers detects a data race on `local_radiance[local_index] +=
      * local_radiance[local_index + stride]`. This is a false positive. Even when doing a manual
      * unroll or make the variable `shared coherent` doesn't work around it. */
+    /* 8 = log2(SPHERE_PROBE_REMAP_GROUP_SIZE^2); literal so it can unroll. */
     for (uint i = 0; i < 8; i++) [[unroll]] {
       barrier();
       uint stride = group_size >> (i + 1u);

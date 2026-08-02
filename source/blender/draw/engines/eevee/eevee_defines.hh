@@ -34,7 +34,13 @@
 #define CULLING_TILE_GROUP_SIZE 256
 
 /* Reflection Probes. */
-/* When changed update the parallel sum loop counts (log2 of the square of this) in
+/* DOWNSTREAM (Android), do not upstream as-is: reduced from 32. 32x32 is 1024 invocations
+ * and 16KB of shared memory, which is inside Adreno 642L's reported limits yet still loses
+ * the device. This costs desktop throughput, and a platform #ifdef is not possible here
+ * because `shader_tool` runs on the host and would desync from the target C++ build. The
+ * real fix is a specialization constant, or clamping to the device's reported
+ * maxComputeWorkGroupInvocations at runtime.
+ * When changed update the parallel sum loop counts (log2 of the square of this) in
  * `eevee_lightprobe_sphere_bake.bsl.hh`; they must be integer literals to unroll. */
 #define SPHERE_PROBE_REMAP_GROUP_SIZE 16
 #define SPHERE_PROBE_GROUP_SIZE 16
