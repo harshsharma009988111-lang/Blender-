@@ -705,33 +705,25 @@ void VKFrameBuffer::rendering_ensure_dynamic_rendering(VKContext &context,
     VkImageView depth_image_view = VK_NULL_HANDLE;
     VkImageView stencil_image_view = VK_NULL_HANDLE;
     if (attachment_state == GPU_ATTACHMENT_WRITE) {
-      /* Classic render passes (the fallback) use one depth/stencil attachment, whose view must
-       * cover both aspects of a combined format. Dynamic rendering binds depth and stencil
-       * separately, so each needs its own single-aspect view. */
-      const bool combined_view = !extensions.dynamic_rendering && is_depth_stencil_attachment;
-      auto view_for_aspect = [&](VkImageAspectFlags vk_aspect) {
-        VKImageViewInfo image_view_info = {
-            eImageViewUsage::Attachment,
-            IndexRange(max_ii(attachment.layer, 0), 1),
-            IndexRange(attachment.mip, 1),
-            {{'r', 'g', 'b', 'a'}},
-            VKImageViewArrayed::DONT_CARE,
-            to_vk_format(depth_texture.device_format_get()),
-            vk_aspect};
-        return depth_texture.image_view_get(image_view_info).vk_handle();
-      };
-
-      if (combined_view) {
-        depth_image_view = view_for_aspect(VK_IMAGE_ASPECT_DEPTH_BIT |
-                                           VK_IMAGE_ASPECT_STENCIL_BIT);
-        stencil_image_view = depth_image_view;
-      }
-      else {
-        depth_image_view = view_for_aspect(VK_IMAGE_ASPECT_DEPTH_BIT);
-        stencil_image_view = is_stencil_attachment ?
-                                 view_for_aspect(VK_IMAGE_ASPECT_STENCIL_BIT) :
-                                 VK_NULL_HANDLE;
-      }
+      /* Depth and stencil share one view: dynamic rendering requires both attachments to name
+       * the same image view, and a classic render pass has a single depth/stencil attachment.
+       * For a combined format that view must therefore cover both aspects - binding a
+       * stencil-only view leaves depth writes and tests without a target. */
+      const VkImageAspectFlags vk_aspect =
+          is_depth_stencil_attachment ?
+              static_cast<VkImageAspectFlags>(VK_IMAGE_ASPECT_DEPTH_BIT |
+                                              VK_IMAGE_ASPECT_STENCIL_BIT) :
+              static_cast<VkImageAspectFlags>(VK_IMAGE_ASPECT_DEPTH_BIT);
+      VKImageViewInfo image_view_info = {
+          eImageViewUsage::Attachment,
+          IndexRange(max_ii(attachment.layer, 0), 1),
+          IndexRange(attachment.mip, 1),
+          {{'r', 'g', 'b', 'a'}},
+          VKImageViewArrayed::DONT_CARE,
+          to_vk_format(depth_texture.device_format_get()),
+          vk_aspect};
+      depth_image_view = depth_texture.image_view_get(image_view_info).vk_handle();
+      stencil_image_view = depth_image_view;
     }
     VkFormat vk_format = (!extensions.dynamic_rendering_unused_attachments &&
                           depth_image_view == VK_NULL_HANDLE) ?
