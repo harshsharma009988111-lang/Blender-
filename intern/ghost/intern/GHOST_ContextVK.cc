@@ -16,7 +16,9 @@
 #elif defined(__APPLE__)
 #  define VK_USE_PLATFORM_METAL_EXT
 #elif defined(__ANDROID__)
-#  define VK_USE_PLATFORM_ANDROID_KHR
+#  ifndef VK_USE_PLATFORM_ANDROID_KHR /* Also set build-wide, so volk generates the surface loader. */
+#    define VK_USE_PLATFORM_ANDROID_KHR
+#  endif
 #else
 #  ifdef WITH_GHOST_X11
 #    define VK_USE_PLATFORM_XLIB_KHR
@@ -40,6 +42,10 @@
 #if !defined(_WIN32) or defined(_M_ARM64)
 /* Silence compilation warning on non-windows x64 systems. */
 #  define VMA_EXTERNAL_MEMORY_WIN32 0
+#endif
+/* Function pointers come from volk, and VMA tests this with #if rather than #ifdef. */
+#ifndef VMA_STATIC_VULKAN_FUNCTIONS
+#  define VMA_STATIC_VULKAN_FUNCTIONS 0
 #endif
 #include "vk_mem_alloc.h"
 
@@ -1170,6 +1176,12 @@ GHOST_TSuccess GHOST_ContextVK::swapBufferRelease()
    * an IDENTITY preTransform on a rotated display reports it forever by design. */
   if (present_result == VK_ERROR_OUT_OF_DATE_KHR) {
     recreateSwapchain(use_hdr_swapchain);
+    return GHOST_kSuccess;
+  }
+  if (present_result == VK_SUBOPTIMAL_KHR) {
+    /* The image was presented; the swap-chain is merely not an optimal match for the
+     * surface. Permanent when preTransform is IDENTITY on a rotated display, so this
+     * must not be reported as a failure once per frame. */
     return GHOST_kSuccess;
   }
   if (present_result != VK_SUCCESS) {
