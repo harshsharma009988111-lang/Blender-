@@ -19,9 +19,25 @@
 
 #ifdef __ANDROID__
 #  include <android/log.h>
+#  include <cstdarg>
 #  include <cstdlib>
 #  include <sys/system_properties.h>
-#  define VKSUBLOG(...) __android_log_print(ANDROID_LOG_INFO, "blender-vksubmit", __VA_ARGS__)
+/* Per-submission tracing, several lines a frame, so off unless `debug.blender.log` is set. */
+static void vk_submit_log(const char *format, ...)
+{
+  static const bool enabled = []() {
+    char value[PROP_VALUE_MAX] = {};
+    return __system_property_get("debug.blender.log", value) > 0 && atoi(value) != 0;
+  }();
+  if (!enabled) {
+    return;
+  }
+  va_list args;
+  va_start(args, format);
+  __android_log_vprint(ANDROID_LOG_INFO, "blender-vksubmit", format, args);
+  va_end(args);
+}
+#  define VKSUBLOG(...) vk_submit_log(__VA_ARGS__)
 #else
 #  define VKSUBLOG(...) ((void)0)
 #endif

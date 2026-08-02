@@ -20,6 +20,8 @@
 
 #ifdef __ANDROID__
 #  include <android/log.h>
+#  include <cstdlib>
+#  include <sys/system_properties.h>
 #endif
 
 namespace blender::gpu {
@@ -262,8 +264,12 @@ void begin_rendering_fallback(VKCommandBufferInterface &command_buffer,
   VkFramebuffer vk_framebuffer = fallback.framebuffer_get(vk_render_pass, data);
 #ifdef __ANDROID__
   {
+    static const bool log_enabled = []() {
+      char value[PROP_VALUE_MAX] = {};
+      return __system_property_get("debug.blender.log", value) > 0 && atoi(value) != 0;
+    }();
     static int counter = 0;
-    if ((counter++ % 50) == 0) {
+    if (log_enabled && (counter++ % 50) == 0) {
       __android_log_print(ANDROID_LOG_INFO,
                           "blender-rpfb",
                           "caches: render_passes=%d framebuffers=%d (begin #%d)",

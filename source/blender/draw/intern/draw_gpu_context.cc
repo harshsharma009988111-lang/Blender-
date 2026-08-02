@@ -24,7 +24,25 @@
 #ifdef __ANDROID__
 #  include <android/log.h>
 #  include <pthread.h>
-#  define DRWLOG(...) __android_log_print(ANDROID_LOG_INFO, "blender-drwlock", __VA_ARGS__)
+#  include <cstdarg>
+#  include <cstdlib>
+#  include <sys/system_properties.h>
+/* Draw-lock tracing, off unless `debug.blender.log` is set. */
+static void drw_android_log(const char *format, ...)
+{
+  static const bool enabled = []() {
+    char value[PROP_VALUE_MAX] = {};
+    return __system_property_get("debug.blender.log", value) > 0 && atoi(value) != 0;
+  }();
+  if (!enabled) {
+    return;
+  }
+  va_list args;
+  va_start(args, format);
+  __android_log_vprint(ANDROID_LOG_INFO, "blender-drwlock", format, args);
+  va_end(args);
+}
+#  define DRWLOG(...) drw_android_log(__VA_ARGS__)
 #else
 #  define DRWLOG(...) ((void)0)
 #endif
