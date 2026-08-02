@@ -10,6 +10,15 @@
 #include <cstdio>
 #include <sstream>
 
+#ifdef WITH_ADRENOTOOLS
+#  include <adrenotools/driver.h>
+#  include <android/log.h>
+#  include <cstdlib>
+#  include <dlfcn.h>
+#  include <string>
+#  include <sys/system_properties.h>
+#endif
+
 #include "BLI_path_utils.hh"
 #include "BLI_string.hh"
 #include "BLI_threads.hh"
@@ -241,6 +250,65 @@ static void vk_restrict_loader_layers()
   BLI_setenv("VK_LOADER_LAYERS_ALLOW", allowed_layers.str().c_str());
 }
 
+#ifdef WITH_ADRENOTOOLS
+/**
+ * Load Mesa Turnip in place of the vendor driver. The hook libraries must live in the app's
+ * nativeLibraryDir (derived from our own library's path) and the driver itself must sit on
+ * internal storage, as dlopen refuses libraries from world-writable locations.
+ */
+static bool android_try_load_turnip()
+{
+  char prop[PROP_VALUE_MAX] = {};
+  if (__system_property_get("debug.blender.turnip", prop) <= 0 || atoi(prop) == 0) {
+    return false;
+  }
+
+  Dl_info info = {};
+  if (dladdr(reinterpret_cast<const void *>(&android_try_load_turnip), &info) == 0 ||
+      info.dli_fname == nullptr)
+  {
+    return false;
+  }
+  std::string native_lib_dir = info.dli_fname;
+  const size_t slash = native_lib_dir.find_last_of('/');
+  if (slash == std::string::npos) {
+    return false;
+  }
+  native_lib_dir.resize(slash + 1);
+
+  const char *driver_dir = "/data/data/org.blender.blender/files/turnip/";
+  const char *driver_name = "vulkan.ad07xx.so";
+
+  void *libvulkan = adrenotools_open_libvulkan(RTLD_NOW,
+                                               ADRENOTOOLS_DRIVER_CUSTOM,
+                                               nullptr,
+                                               native_lib_dir.c_str(),
+                                               driver_dir,
+                                               driver_name,
+                                               nullptr,
+                                               nullptr);
+  __android_log_print(ANDROID_LOG_INFO,
+                      "blender-turnip",
+                      "hooks=%s driver=%s%s -> %p",
+                      native_lib_dir.c_str(),
+                      driver_dir,
+                      driver_name,
+                      libvulkan);
+  if (libvulkan == nullptr) {
+    return false;
+  }
+  PFN_vkGetInstanceProcAddr get_instance_proc_addr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(
+      dlsym(libvulkan, "vkGetInstanceProcAddr"));
+  if (get_instance_proc_addr == nullptr) {
+    __android_log_print(ANDROID_LOG_ERROR, "blender-turnip", "no vkGetInstanceProcAddr in driver");
+    return false;
+  }
+  volkInitializeCustom(get_instance_proc_addr);
+  __android_log_print(ANDROID_LOG_INFO, "blender-turnip", "loaded %s", driver_name);
+  return true;
+}
+#endif
+
 static bool vk_instance_create_for_platform_checks(VkInstance *r_instance)
 {
 #ifndef __ANDROID__
@@ -249,7 +317,20 @@ static bool vk_instance_create_for_platform_checks(VkInstance *r_instance)
   vk_restrict_loader_layers();
 #endif
 
+#ifdef WITH_ADRENOTOOLS
+  /* Optionally replace the vendor driver with Mesa Turnip, which supports dynamic rendering and
+   * avoids the render-pass fallback. Enable with `setprop debug.blender.turnip 1`. */
+  if (!android_try_load_turnip()) {
+    VkResult volk_result = volkInitialize();
+    if (volk_result != VK_SUCCESS) {
+      CLOG_ERROR(&LOG, "Error initializing Vulkan loader: VkResult=%d", volk_result);
+      return false;
+    }
+  }
+  VkResult vk_result = VK_SUCCESS;
+#else
   VkResult vk_result = volkInitialize();
+#endif
   if (vk_result != VK_SUCCESS) {
     CLOG_ERROR(&LOG,
                "Error initializing Vulkan loader: VkResult=%d, most likely cannot find the Vulkan "
