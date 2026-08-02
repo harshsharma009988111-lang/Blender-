@@ -1018,10 +1018,10 @@ GHOST_TSuccess GHOST_ContextVK::swapBufferAcquire()
   if (swapchain_ != VK_NULL_HANDLE) {
     /* Some platforms (NVIDIA/Wayland) can receive an out of date swapchain when acquiring the next
      * swapchain image. Other do it when calling vkQueuePresent. */
+    /* Not SUBOPTIMAL: that image is acquired and usable, so re-acquiring would leak it.
+     * Requesting an IDENTITY preTransform on a rotated display makes it permanent. */
     VkResult acquire_result = VK_ERROR_OUT_OF_DATE_KHR;
-    while (swapchain_ != VK_NULL_HANDLE &&
-           (ELEM(acquire_result, VK_ERROR_OUT_OF_DATE_KHR, VK_SUBOPTIMAL_KHR)))
-    {
+    while (swapchain_ != VK_NULL_HANDLE && acquire_result == VK_ERROR_OUT_OF_DATE_KHR) {
       acquire_result = device_vk.functions.vkAcquireNextImageKHR(
           vk_device,
           swapchain_,
@@ -1029,7 +1029,7 @@ GHOST_TSuccess GHOST_ContextVK::swapBufferAcquire()
           submission_frame_data.acquire_semaphore,
           VK_NULL_HANDLE,
           &image_index);
-      if (ELEM(acquire_result, VK_ERROR_OUT_OF_DATE_KHR, VK_SUBOPTIMAL_KHR)) {
+      if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR) {
         recreateSwapchain(use_hdr_swapchain);
       }
     }
@@ -1166,7 +1166,9 @@ GHOST_TSuccess GHOST_ContextVK::swapBufferRelease()
   }
   acquired_swapchain_image_index_.reset();
 
-  if (ELEM(present_result, VK_ERROR_OUT_OF_DATE_KHR, VK_SUBOPTIMAL_KHR)) {
+  /* SUBOPTIMAL presented correctly, so rebuilding on it costs a swapchain every frame:
+   * an IDENTITY preTransform on a rotated display reports it forever by design. */
+  if (present_result == VK_ERROR_OUT_OF_DATE_KHR) {
     recreateSwapchain(use_hdr_swapchain);
     return GHOST_kSuccess;
   }
