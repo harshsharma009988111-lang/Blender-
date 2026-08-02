@@ -1626,9 +1626,19 @@ GHOST_TSuccess GHOST_ContextVK::recreateSwapchain(bool use_hdr_swapchain)
   create_info.queueFamilyIndexCount = 0;
   create_info.pQueueFamilyIndices = nullptr;
 
-  VK_CHECK(device_vk.functions.vkCreateSwapchainKHR(
-               device_vk.vk_device, &create_info, nullptr, &swapchain_),
-           GHOST_kFailure);
+  VkResult create_result = device_vk.functions.vkCreateSwapchainKHR(
+      device_vk.vk_device, &create_info, nullptr, &swapchain_);
+  if (create_result != VK_SUCCESS) {
+    /* The old swapchain still owns the native window. Retire it here, else every later attempt
+     * fails with VK_ERROR_NATIVE_WINDOW_IN_USE_KHR and the window never recovers. */
+    if (old_swapchain != VK_NULL_HANDLE) {
+      discard_pile.swapchains.push_back(old_swapchain);
+    }
+    swapchain_ = VK_NULL_HANDLE;
+    CLOG_ERROR(
+        &LOG, "Vulkan: vkCreateSwapchainKHR failed [%s]", to_string(create_result).c_str());
+    return GHOST_kFailure;
+  }
 
   /* image_count may not be what we requested! Getter for final value. */
   uint32_t actual_image_count = 0;
