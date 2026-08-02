@@ -4328,6 +4328,19 @@ void wm_event_do_handlers(bContext *C)
       }
 #endif
 
+      /* A pointer that leaves the window sends no further motion, so a tool-tip left
+       * behind can never be dismissed. Reachable with a stylus, which stops reporting
+       * once it leaves proximity. Clear regardless of `exit_on_event`, which only
+       * governs how far the pointer must move while it is still present. */
+      if (screen->tool_tip && ISMOUSE_MOTION(event->type)) {
+        const int2 win_size = WM_window_native_pixel_size(&win);
+        if (event->xy[0] < 0 || event->xy[1] < 0 || event->xy[0] >= win_size[0] ||
+            event->xy[1] >= win_size[1])
+        {
+          WM_tooltip_clear(C, &win);
+        }
+      }
+
       /* Clear tool-tip on mouse move. */
       if (screen->tool_tip && screen->tool_tip->exit_on_event) {
         if (ISMOUSE_MOTION(event->type)) {
