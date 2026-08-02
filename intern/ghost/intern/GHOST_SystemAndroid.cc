@@ -271,11 +271,16 @@ int32_t GHOST_SystemAndroid::handleMotionEvent(AInputEvent *event)
                                                       GHOST_kTrackpadEventScroll,
                                                       int32_t(cx),
                                                       int32_t(cy),
-                                                      /* Negated so the view follows the
-                                                       * fingers rather than opposing them. */
-                                                      int32_t(gesture_prev_x_ - cx),
-                                                      int32_t(gesture_prev_y_ - cy),
-                                                      false));
+                                                      /* Report the physical finger delta; the
+                                                       * inverted flag below is what makes the
+                                                       * view follow the fingers. Negating here
+                                                       * too only fixes the consumers that ignore
+                                                       * the flag, inverting all the others. */
+                                                      int32_t(cx - gesture_prev_x_),
+                                                      int32_t(cy - gesture_prev_y_),
+                                                      /* Direct touch is natural scrolling, as
+                                                       * macOS reports it. */
+                                                      true));
       pushEvent(std::make_unique<GHOST_EventTrackpad>(getMilliSeconds(),
                                                       window_,
                                                       GHOST_kTrackpadEventMagnify,
