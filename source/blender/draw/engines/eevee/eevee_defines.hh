@@ -34,18 +34,16 @@
 #define CULLING_TILE_GROUP_SIZE 256
 
 /* Reflection Probes. */
-/* When changed update parallel sum loop in `eevee_lightprobe_sphere_remap_comp.glsl`. */
-#define SPHERE_PROBE_REMAP_GROUP_SIZE 32
+/* When changed update the parallel sum loop counts (log2 of the square of this) in
+ * `eevee_lightprobe_sphere_bake.bsl.hh`; they must be integer literals to unroll. */
+#define SPHERE_PROBE_REMAP_GROUP_SIZE 16
 #define SPHERE_PROBE_GROUP_SIZE 16
 #define SPHERE_PROBE_SELECT_GROUP_SIZE 64
 #define SPHERE_PROBE_MIPMAP_LEVELS 5
 #define SPHERE_PROBE_SH_GROUP_SIZE 256
 #define SPHERE_PROBE_SH_SAMPLES_PER_GROUP 64
 /* Must be power of two for correct partitioning. */
-/* 12 (4096px) costs 170MB per atlas, which mobile GPUs cannot spare; 10 (1024px) keeps the
- * transient spike of a preview render clear of the low memory killer. Shaders share this
- * header, so it cannot be made conditional on the platform. */
-#define SPHERE_PROBE_ATLAS_MAX_SUBDIV 10
+#define SPHERE_PROBE_ATLAS_MAX_SUBDIV 12
 #define SPHERE_PROBE_ATLAS_RES (1 << SPHERE_PROBE_ATLAS_MAX_SUBDIV)
 /* Maximum number of thread-groups dispatched for remapping a probe to octahedral mapping. */
 #define SPHERE_PROBE_MAX_HARMONIC SQUARE(SPHERE_PROBE_ATLAS_RES / SPHERE_PROBE_REMAP_GROUP_SIZE)
