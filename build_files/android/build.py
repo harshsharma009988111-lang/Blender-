@@ -1,0 +1,237 @@
+#!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Blender Authors
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+"""Build, package and deploy Blender for Android.
+
+Wraps the shell scripts in this directory so the four usable builds are one
+command each:
+
+    ./build.py lite                     # lite APK
+    ./build.py full --install --run     # full APK onto the connected device
+    ./build.py lite --validation        # + Khronos validation layer
+    ./build.py --enable-turnip          # run on Mesa Turnip (no rebuild)
+
+Run with --help for the rest.
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import shutil
+import subprocess
+import sys
+import urllib.request
+import zipfile
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent.parent
+BUILD_BASE = REPO_ROOT.parent / "blender_build_android"
+
+PACKAGE = "org.blender.blender"
+ACTIVITY = f"{PACKAGE}/.BlenderActivity"
+
+# Pinned so a validation run is reproducible; bump deliberately.
+VVL_VERSION = "1.4.357.0"
+VVL_URL = (
+    "https://github.com/KhronosGroup/Vulkan-ValidationLayers/releases/download/"
+    f"vulkan-sdk-{VVL_VERSION}/android-binaries-{VVL_VERSION}.zip"
+)
+VVL_SO = "libVkLayer_khronos_validation.so"
+
+# Caches that survive reinstall and will happily serve stale shaders.
+DEVICE_CACHES = (
+    "vk-spirv-cache-vk11",
+    "vk-spirv-cache-vk12",
+    "vk-pipeline-cache",
+)
+
+
+def run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
+    print("+ " + " ".join(str(c) for c in cmd), flush=True)
+    return subprocess.run(cmd, check=True, **kwargs)
+
+
+def sh(script: str) -> None:
+    """Run a snippet through the login shell so env.sh resolves the SDK."""
+    run(["bash", "-lc", script])
+
+
+def env_from_env_sh() -> dict[str, str]:
+    """env.sh owns the SDK/NDK locations; read them rather than guessing."""
+    out = subprocess.run(
+        ["bash", "-c", f"unset ANDROID_HOME; source '{SCRIPT_DIR / 'env.sh'}' >/dev/null && env"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    return dict(
+        line.split("=", 1) for line in out.splitlines() if "=" in line
+    )
+
+
+def adb(args: list[str], serial: str | None, **kwargs) -> subprocess.CompletedProcess:
+    cmd = ["adb"] + (["-s", serial] if serial else []) + args
+    return run(cmd, **kwargs)
+
+
+def stage_dir(config: str) -> Path:
+    return BUILD_BASE / f"android_apk_stage_{config}"
+
+
+def apk_path(config: str) -> Path:
+    return stage_dir(config) / f"blender-{config}.apk"
+
+
+def clean(config: str) -> None:
+    for path in (
+        BUILD_BASE / f"build_android_{config}",
+        BUILD_BASE / f"build_host_tools_{config}",
+        stage_dir(config),
+    ):
+        if path.exists():
+            print(f"removing {path}")
+            shutil.rmtree(path)
+
+
+def build(config: str) -> None:
+    sh(f"'{SCRIPT_DIR / 'build_apk.sh'}' {config}")
+
+
+def fetch_validation_layer() -> Path:
+    """Return a local copy of the arm64 validation layer, downloading once."""
+    cache = BUILD_BASE / "validation-layers" / VVL_VERSION
+    layer = cache / VVL_SO
+    if layer.exists():
+        return layer
+
+    cache.mkdir(parents=True, exist_ok=True)
+    archive = cache / "android-binaries.zip"
+    print(f"downloading {VVL_URL}")
+    urllib.request.urlretrieve(VVL_URL, archive)
+    with zipfile.ZipFile(archive) as zf:
+        member = next(
+            name for name in zf.namelist() if name.endswith(f"arm64-v8a/{VVL_SO}")
+        )
+        with zf.open(member) as src, open(layer, "wb") as dst:
+            shutil.copyfileobj(src, dst)
+    archive.unlink()
+    print(f"validation layer -> {layer}")
+    return layer
+
+
+def inject_validation_layer(config: str) -> None:
+    """Add the layer to an already-built APK and re-sign it.
+
+    package.sh wipes its staging directory on entry, so the layer cannot be
+    staged beforehand: it has to go in afterwards.
+    """
+    env = env_from_env_sh()
+    build_tools = Path(env["ANDROID_HOME"]) / "build-tools" / "35.0.1"
+    keystore = BUILD_BASE / "android-debug.keystore"
+    stage = stage_dir(config)
+    apk = apk_path(config)
+
+    shutil.copy2(fetch_validation_layer(), stage / "lib" / "arm64-v8a" / VVL_SO)
+    run(["zip", "-q", str(apk), f"lib/arm64-v8a/{VVL_SO}"], cwd=stage)
+
+    aligned = stage / "aligned.apk"
+    run([str(build_tools / "zipalign"), "-f", "-p", "4", str(apk), str(aligned)])
+    aligned.replace(apk)
+    run([
+        str(build_tools / "apksigner"), "sign",
+        "--ks", str(keystore),
+        "--ks-pass", "pass:android",
+        "--key-pass", "pass:android",
+        str(apk),
+    ])
+    print("validation layer bundled; enable it with --enable-validation-layers")
+
+
+def set_validation_layers(enabled: bool, serial: str | None) -> None:
+    settings = {
+        "enable_gpu_debug_layers": "1" if enabled else "0",
+        "gpu_debug_app": PACKAGE if enabled else "null",
+        "gpu_debug_layers": "VK_LAYER_KHRONOS_validation" if enabled else "null",
+    }
+    for key, value in settings.items():
+        adb(["shell", "settings", "put", "global", key, value], serial)
+    print(f"validation layers {'enabled' if enabled else 'disabled'}")
+
+
+def set_property(name: str, value: str, serial: str | None) -> None:
+    adb(["shell", "setprop", name, value], serial)
+    print(f"{name} = {value}")
+
+
+def clear_caches(serial: str | None) -> None:
+    base = f"/sdcard/Android/data/{PACKAGE}/files/blender"
+    adb(["shell", "rm", "-rf"] + [f"{base}/{name}" for name in DEVICE_CACHES], serial)
+    print("shader and pipeline caches cleared")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("config", nargs="?", choices=("lite", "full"),
+                        help="feature set to build; omit for device-only actions")
+    parser.add_argument("--clean", action="store_true",
+                        help="wipe this config's build trees first")
+    parser.add_argument("--validation", action="store_true",
+                        help="bundle the Khronos validation layer into the APK")
+    parser.add_argument("--install", action="store_true", help="adb install the APK")
+    parser.add_argument("--run", action="store_true", help="launch after installing")
+    parser.add_argument("--clear-caches", action="store_true",
+                        help="drop the on-device shader and pipeline caches")
+    parser.add_argument("--enable-validation-layers", action="store_true")
+    parser.add_argument("--disable-validation-layers", action="store_true")
+    parser.add_argument("--enable-turnip", action="store_true",
+                        help="run on Mesa Turnip instead of the vendor driver")
+    parser.add_argument("--disable-turnip", action="store_true")
+    parser.add_argument("--verbose-log", action="store_true",
+                        help="per-frame Vulkan tracing (debug.blender.log)")
+    parser.add_argument("-s", "--serial", help="adb device serial")
+    args = parser.parse_args()
+
+    if args.config:
+        if args.clean:
+            clean(args.config)
+        build(args.config)
+        if args.validation:
+            inject_validation_layer(args.config)
+        print(f"APK: {apk_path(args.config)}")
+
+    if args.install:
+        if not args.config:
+            parser.error("--install needs a config")
+        adb(["install", "-r", str(apk_path(args.config))], args.serial)
+
+    if args.clear_caches:
+        clear_caches(args.serial)
+    if args.enable_validation_layers:
+        set_validation_layers(True, args.serial)
+    if args.disable_validation_layers:
+        set_validation_layers(False, args.serial)
+    if args.enable_turnip:
+        set_property("debug.blender.turnip", "1", args.serial)
+    if args.disable_turnip:
+        set_property("debug.blender.turnip", "0", args.serial)
+    if args.verbose_log:
+        set_property("debug.blender.log", "1", args.serial)
+
+    if args.run:
+        adb(["shell", "am", "force-stop", PACKAGE], args.serial)
+        adb(["shell", "am", "start", "-n", ACTIVITY], args.serial)
+
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except subprocess.CalledProcessError as ex:
+        print(f"\nfailed: {' '.join(str(c) for c in ex.cmd)}", file=sys.stderr)
+        sys.exit(ex.returncode)

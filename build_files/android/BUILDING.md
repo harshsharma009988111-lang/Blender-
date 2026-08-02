@@ -26,6 +26,15 @@ tools + build + stage dirs.
 ### One-shot build
 
 ```bash
+build_files/android/build.py full         # or: lite
+build_files/android/build.py full --install --run
+```
+
+`build.py` wraps everything below and additionally handles the validation and
+Turnip variants, the on-device debug switches, and cache clearing; run it with
+`--help` for the list. The shell script it calls still works on its own:
+
+```bash
 build_files/android/build_apk.sh full     # or: lite
 ```
 
@@ -165,6 +174,91 @@ adb logcat --pid=$(adb shell pidof org.blender.blender)
 **Android Studio (Run/Debug):** run `package.sh` once (to stage libs+assets),
 then open `build_files/android/apk` as a project. The gradle app module consumes
 `../blender_build_android/android_apk_stage/{lib,assets}` and can Run/Debug on a device or AVD.
+
+---
+
+## Variants
+
+Variants are switches on top of a config, not extra configs.
+
+### Validation layers
+
+Bundles the Khronos validation layer into the APK. Blender must also be started
+with `--debug-gpu` so it installs a debug messenger; messages then arrive in
+logcat under the `gpu.vulkan` category rather than a `VALIDATION` tag.
+
+```bash
+build_files/android/build.py lite --validation --install
+build_files/android/build.py --enable-validation-layers
+adb logcat -s blender | grep -E "ERROR|WARNING"
+build_files/android/build.py --disable-validation-layers   # when finished
+```
+
+Adds ~27 MB to the APK and slows the app noticeably, so it is a debugging build
+only. The layer is downloaded once and cached in
+`../blender_build_android/validation-layers/`.
+
+Two messages are expected on a Vulkan 1.1 Adreno device and are not bugs:
+
+- `WARNING-Swapchain-PreTransform` — the swap-chain deliberately requests an
+  IDENTITY `preTransform` so the compositor performs the rotation; Blender does
+  not pre-rotate its rendering.
+- `Undefined-Value-ShaderOutputNotConsumed` — a depth-only pass whose fragment
+  shader still declares a colour output. The write is discarded.
+
+### Turnip (Mesa) driver
+
+Loads Mesa's Turnip in place of the vendor driver through `libadrenotools`,
+which provides `VK_KHR_dynamic_rendering` on devices whose vendor driver is
+Vulkan 1.1 only, bypassing the render-pass fallback. Selected at runtime, so no
+separate build is needed — but the Turnip driver must be present on the device.
+
+```bash
+build_files/android/build.py --enable-turnip
+build_files/android/build.py --disable-turnip
+```
+
+---
+
+## On-device debug switches
+
+System properties, read once at startup.
+
+| Property | Effect |
+| --- | --- |
+| `debug.blender.log` | Per-frame Vulkan submission and draw-lock tracing. Off by default: it costs several logcat lines per frame. |
+| `debug.blender.turnip` | Load Mesa Turnip instead of the vendor driver. |
+| `debug.blender.lowmem` | Force the low-memory device tier. |
+| `debug.blender.renderdiv` | Render-scale divisor; `2` renders at half resolution. |
+
+```bash
+adb shell setprop debug.blender.log 1
+```
+
+### Shader caches
+
+SPIR-V and pipeline caches live in the app's external files directory and
+survive reinstalling, so they will mask shader changes. Clear them whenever
+shaders or Vulkan code change:
+
+```bash
+build_files/android/build.py --clear-caches
+```
+
+---
+
+## Gotchas
+
+- **Host tools must match the target feature set.** Generated RNA/DNA encodes
+  the enabled features, so each config keeps its own host-tools tree. Pointing
+  one config at another's tools fails deep into the build with missing getters.
+- **`apk/package.sh` deletes its staging directory on entry.** Anything copied
+  in beforehand is discarded; that is why `--validation` injects the layer after
+  packaging and re-signs, rather than staging it first.
+- **Android requires unversioned sonames.** `package.sh` runs `patchelf` over
+  the gathered libraries; a dependency arriving as `libfoo.so.1` will not load.
+- **`android:debuggable` is `true`** in the manifest. Needed to attach
+  validation layers, but wrong for a build handed to other people.
 
 ---
 
