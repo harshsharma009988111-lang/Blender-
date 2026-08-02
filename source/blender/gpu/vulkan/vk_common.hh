@@ -21,6 +21,8 @@
 #include "volk.h"
 
 #define VMA_VULKAN_VERSION 1002000  // Vulkan 1.2
+/* Function pointers come from volk, and VMA tests this with #if rather than #ifdef. */
+#define VMA_STATIC_VULKAN_FUNCTIONS 0
 #if !defined(_WIN32) or defined(_M_ARM64)
 /* Silence compilation warning on non-windows x64 systems. */
 #  define VMA_EXTERNAL_MEMORY_WIN32 0
