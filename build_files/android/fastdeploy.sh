@@ -49,6 +49,11 @@ mv "$STAGE/fast-aligned.apk" "$OUT"
 "$BT/apksigner" sign --ks "$BUILD_BASE/android-debug.keystore" \
   --ks-pass pass:android --key-pass pass:android "$OUT"
 
+if [ -n "${FASTDEPLOY_NO_INSTALL:-}" ]; then
+  echo "=== built ($CONFIG), install skipped ==="
+  exit 0
+fi
+
 echo "=== install + launch ==="
 "$ADB" install -r "$OUT"
 "$ADB" shell am force-stop org.blender.blender

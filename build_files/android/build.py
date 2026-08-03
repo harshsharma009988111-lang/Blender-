@@ -54,6 +54,17 @@ def run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, check=True, **kwargs)
 
 
+def tool_env() -> dict[str, str]:
+    """env.sh settings merged over the caller's environment.
+
+    zipalign and apksigner are wrapper scripts that need JAVA_HOME and the SDK
+    on PATH, so they cannot inherit a bare environment.
+    """
+    merged = dict(os.environ)
+    merged.update(env_from_env_sh())
+    return merged
+
+
 def sh(script: str) -> None:
     """Run a snippet through the login shell so env.sh resolves the SDK."""
     run(["bash", "-lc", script])
@@ -96,8 +107,20 @@ def clean(config: str) -> None:
             shutil.rmtree(path)
 
 
-def build(config: str) -> None:
-    sh(f"'{SCRIPT_DIR / 'build_apk.sh'}' {config}")
+def build(config: str, repackage: bool = False) -> None:
+    """Recompile and repackage.
+
+    Once a config has been packaged, only libblender.so normally changes, so
+    reuse the staged runtime payload instead of rebuilding the 61 MB asset zip
+    and re-gathering every native library. That is minutes versus seconds.
+    """
+    stage = stage_dir(config)
+    can_fast = (stage / "base.apk").exists() and (stage / "lib/arm64-v8a/libblender.so").exists()
+    if can_fast and not repackage:
+        # fastdeploy installs and launches at the end; build.py owns that.
+        sh(f"FASTDEPLOY_NO_INSTALL=1 '{SCRIPT_DIR / 'fastdeploy.sh'}' {config}")
+    else:
+        sh(f"'{SCRIPT_DIR / 'build_apk.sh'}' {config}")
 
 
 def fetch_validation_layer() -> Path:
@@ -128,7 +151,7 @@ def inject_validation_layer(config: str) -> None:
     package.sh wipes its staging directory on entry, so the layer cannot be
     staged beforehand: it has to go in afterwards.
     """
-    env = env_from_env_sh()
+    env = tool_env()
     build_tools = Path(env["ANDROID_HOME"]) / "build-tools" / "35.0.1"
     keystore = BUILD_BASE / "android-debug.keystore"
     stage = stage_dir(config)
@@ -138,7 +161,7 @@ def inject_validation_layer(config: str) -> None:
     run(["zip", "-q", str(apk), f"lib/arm64-v8a/{VVL_SO}"], cwd=stage)
 
     aligned = stage / "aligned.apk"
-    run([str(build_tools / "zipalign"), "-f", "-p", "4", str(apk), str(aligned)])
+    run([str(build_tools / "zipalign"), "-f", "-p", "4", str(apk), str(aligned)], env=env)
     aligned.replace(apk)
     run([
         str(build_tools / "apksigner"), "sign",
@@ -146,7 +169,7 @@ def inject_validation_layer(config: str) -> None:
         "--ks-pass", "pass:android",
         "--key-pass", "pass:android",
         str(apk),
-    ])
+    ], env=env)
     print("validation layer bundled; enable it with --enable-validation-layers")
 
 
@@ -180,6 +203,9 @@ def main() -> int:
                         help="feature set to build; omit for device-only actions")
     parser.add_argument("--clean", action="store_true",
                         help="wipe this config's build trees first")
+    parser.add_argument("--repackage", action="store_true",
+                        help="rebuild the runtime payload too; needed when scripts, "
+                             "datafiles or the dependency set change")
     parser.add_argument("--validation", action="store_true",
                         help="bundle the Khronos validation layer into the APK")
     parser.add_argument("--install", action="store_true", help="adb install the APK")
@@ -199,7 +225,7 @@ def main() -> int:
     if args.config:
         if args.clean:
             clean(args.config)
-        build(args.config)
+        build(args.config, repackage=args.repackage or args.clean)
         if args.validation:
             inject_validation_layer(args.config)
         print(f"APK: {apk_path(args.config)}")
