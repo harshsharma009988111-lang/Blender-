@@ -655,6 +655,10 @@ struct GHOST_InstanceVK {
     vulkan_12_features.shaderOutputViewportIndex = device.features_12.shaderOutputViewportIndex;
     vulkan_12_features.bufferDeviceAddress = device.features_12.bufferDeviceAddress;
     vulkan_12_features.timelineSemaphore = VK_TRUE;
+    /* Depth-only and stencil-only image layouts are invalid without this, and the backend
+     * uses them whenever it is enabled. */
+    vulkan_12_features.separateDepthStencilLayouts =
+        device.features_12.separateDepthStencilLayouts;
     feature_struct_ptr.push_back(&vulkan_12_features);
 
 #ifndef __APPLE__
