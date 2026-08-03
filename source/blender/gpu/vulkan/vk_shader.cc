@@ -881,10 +881,7 @@ std::string VKShader::vertex_interface_declare(const shader::ShaderCreateInfo &i
   const bool has_geometry_stage = do_geometry_shader_injection(&info) ||
                                   !info.geometry_source_.is_empty();
   const bool do_layer_output = flag_is_set(info.builtins_, BuiltinBits::LAYER);
-  /* Writing gl_ViewportIndex needs the MultiViewport capability, which is only valid when
-   * the device supports multiViewport. Without it the framebuffer uses one viewport anyway. */
-  const bool do_viewport_output = flag_is_set(info.builtins_, BuiltinBits::VIEWPORT_INDEX) &&
-                                  vk_extensions.multi_viewport;
+  const bool do_viewport_output = flag_is_set(info.builtins_, BuiltinBits::VIEWPORT_INDEX);
   if (has_geometry_stage) {
     if (do_layer_output) {
       ss << "layout(location=" << (location++) << ") out int gpu_Layer;\n ";
@@ -898,7 +895,15 @@ std::string VKShader::vertex_interface_declare(const shader::ShaderCreateInfo &i
       ss << "#define gpu_Layer gl_Layer\n";
     }
     if (do_viewport_output) {
-      ss << "#define gpu_ViewportIndex gl_ViewportIndex\n";
+      /* Aliasing to gl_ViewportIndex declares the MultiViewport capability, which is invalid
+       * without the feature. Such devices expose a single viewport, so keep the name defined
+       * and let the writes go nowhere. */
+      if (vk_extensions.multi_viewport) {
+        ss << "#define gpu_ViewportIndex gl_ViewportIndex\n";
+      }
+      else {
+        ss << "int gpu_ViewportIndex;\n";
+      }
     }
   }
   ss << "\n";
@@ -982,7 +987,12 @@ std::string VKShader::fragment_interface_declare(const shader::ShaderCreateInfo 
     ss << "#define gpu_Layer gl_Layer\n";
   }
   if (flag_is_set(info.builtins_, BuiltinBits::VIEWPORT_INDEX)) {
-    ss << "#define gpu_ViewportIndex gl_ViewportIndex\n";
+    if (extensions.multi_viewport) {
+      ss << "#define gpu_ViewportIndex gl_ViewportIndex\n";
+    }
+    else {
+      ss << "int gpu_ViewportIndex;\n";
+    }
   }
 
   if (!extensions.fragment_shader_barycentric &&
@@ -1201,8 +1211,7 @@ std::string VKShader::workaround_geometry_shader_source_create(
   const VKExtensions &extensions = VKBackend::get().device.extensions_get();
 
   const bool do_layer_output = flag_is_set(info.builtins_, BuiltinBits::LAYER);
-  const bool do_viewport_output = flag_is_set(info.builtins_, BuiltinBits::VIEWPORT_INDEX) &&
-                                  extensions.multi_viewport;
+  const bool do_viewport_output = flag_is_set(info.builtins_, BuiltinBits::VIEWPORT_INDEX);
   const bool do_barycentric_workaround = !extensions.fragment_shader_barycentric &&
                                          flag_is_set(info.builtins_,
                                                      BuiltinBits::BARYCENTRIC_COORD);
@@ -1256,7 +1265,7 @@ std::string VKShader::workaround_geometry_shader_source_create(
     if (do_layer_output) {
       ss << "  gl_Layer = gpu_Layer[" << i << "];\n";
     }
-    if (do_viewport_output) {
+    if (do_viewport_output && extensions.multi_viewport) {
       ss << "  gl_ViewportIndex = gpu_ViewportIndex[" << i << "];\n";
     }
     ss << "  gpu_EmitVertex();\n";
