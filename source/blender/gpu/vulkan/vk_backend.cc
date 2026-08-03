@@ -698,6 +698,14 @@ void VKBackend::detect_workarounds(VKDevice &device)
     extensions.vertex_input_dynamic_state = false;
   }
 
+  /* The library build paths always describe their attachments through the dynamic rendering
+   * pNext chain and leave renderPass null, which is only valid with dynamicRendering enabled.
+   * Only the monolithic path substitutes a compatible render pass, so restrict pipeline
+   * libraries to devices that have dynamic rendering. */
+  if (!extensions.dynamic_rendering) {
+    extensions.graphics_pipeline_library = false;
+  }
+
   /* Disable vertex input dynamic state for Qualcomm devices (#153414).
    *
    * TODO: We should re-validate vertex input dynamic state as there are multiple vendors with
