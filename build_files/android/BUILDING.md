@@ -76,6 +76,17 @@ git lfs install --local && git lfs pull
 git -c submodule.lib/macos_arm64.update=checkout submodule update --init lib/macos_arm64
 ```
 
+`git lfs pull` asks for a username and password for projects.blender.org. The
+content is public, so press Enter twice and it proceeds. Unattended runs have no
+terminal to prompt at and hang silently instead, with no output and no traffic,
+which is indistinguishable from a stalled download. For scripts, hand it empty
+credentials up front:
+
+```bash
+git config credential.helper '!f() { echo username=; echo password=; }; f'
+```
+
+
 `lib/macos_arm64` is needed for the **native host tools** build (step 3).
 
 ---
