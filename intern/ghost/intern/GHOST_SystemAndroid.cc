@@ -55,6 +55,7 @@ GHOST_SystemAndroid::GHOST_SystemAndroid()
       touch_pending_(false),
       touch_button_down_(false),
       touch_button_(GHOST_kButtonMaskLeft),
+      touch_tablet_(GHOST_TABLET_DATA_NONE),
       touch_down_time_(0),
       touch_down_x_(0),
       touch_down_y_(0)
@@ -317,6 +318,8 @@ int32_t GHOST_SystemAndroid::handleMotionEvent(AInputEvent *event)
   cursor_x_ = x;
   cursor_y_ = y;
 
+  touch_tablet_ = tablet;
+
   /* Cursor tracks the tip whether touching or hovering (S Pen proximity). */
   pushEvent(std::make_unique<GHOST_EventCursor>(
       getMilliSeconds(), GHOST_kEventCursorMove, window_, x, y, tablet));
@@ -387,7 +390,7 @@ void GHOST_SystemAndroid::touchSendButton(GHOST_TButton mask, GHOST_TEventType t
   touch_button_ = mask;
   touch_button_down_ = down;
   pushEvent(std::make_unique<GHOST_EventButton>(
-      getMilliSeconds(), type, window_, mask, GHOST_TABLET_DATA_NONE));
+      getMilliSeconds(), type, window_, mask, touch_tablet_));
 }
 
 void GHOST_SystemAndroid::touchLongPressCheck()

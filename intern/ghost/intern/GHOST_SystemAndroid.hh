@@ -114,6 +114,11 @@ class GHOST_SystemAndroid : public GHOST_System {
   bool touch_pending_;          /* Finger down, button not decided yet. */
   bool touch_button_down_;      /* A button was emitted and is still held. */
   GHOST_TButton touch_button_;  /* Which button was emitted. */
+  /* Tablet state of the pointer the buttons belong to. Blender picks the drag
+   * threshold from this, and a stylus needs the larger tablet one: judged as a
+   * mouse, normal tremor between contact and lift is read as a drag, so the
+   * release never becomes a click and menu entries do not fire. */
+  GHOST_TabletData touch_tablet_;
   uint64_t touch_down_time_;
   int32_t touch_down_x_, touch_down_y_;
 
