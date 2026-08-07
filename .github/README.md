@@ -11,6 +11,15 @@ See 'release/text/readme.html' for the end user read-me.
 Blender
 =======
 
+> **This is an unofficial fork: Blender ported to Android (arm64, Vulkan).**
+>
+> - Ready-made APKs: [Releases](https://github.com/simfeo/blender/releases)
+> - Building from source: [build_files/android/BUILDING.md](build_files/android/BUILDING.md)
+> - Tested on a Samsung Galaxy Tab S7 FE (Adreno 642L, Vulkan 1.1) and a
+>   Galaxy S22 Ultra SM-S908B (Xclipse 920, Vulkan 1.3).
+>
+> Everything below is the upstream Blender read-me.
+
 Blender is the free and open source 3D creation suite.
 It supports the entirety of the 3D pipeline—modeling, rigging, animation, simulation, rendering, compositing,
 motion tracking and video editing.
