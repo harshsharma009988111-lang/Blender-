@@ -9,13 +9,25 @@
 # installed via Homebrew `android-commandlinetools` + `sdkmanager`.
 
 # --- SDK / NDK locations -----------------------------------------------------
-export ANDROID_HOME="${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}"
+# Host differences: the NDK ships per-host prebuilt binaries, and the SDK lands
+# wherever each platform's package manager puts it.
+case "$(uname -s)" in
+  Darwin) ANDROID_HOST_TAG="darwin-x86_64"; ANDROID_HOME_DEFAULT="/opt/homebrew/share/android-commandlinetools" ;;
+  Linux)  ANDROID_HOST_TAG="linux-x86_64";  ANDROID_HOME_DEFAULT="$HOME/android-sdk" ;;
+  *)      echo "[blender-android] WARNING: unsupported host $(uname -s)" ;;
+esac
+export ANDROID_HOST_TAG
+export ANDROID_HOME="${ANDROID_HOME:-$ANDROID_HOME_DEFAULT}"
 export ANDROID_NDK_VERSION="${ANDROID_NDK_VERSION:-28.2.13676358}"
 export ANDROID_NDK_ROOT="${ANDROID_NDK_ROOT:-$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION}"
 export ANDROID_NDK_HOME="$ANDROID_NDK_ROOT"
 
-# JDK (keg-only Homebrew openjdk) — needed for sdkmanager/adb wrappers.
-export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home}"
+# JDK (keg-only Homebrew openjdk) - needed for sdkmanager/adb wrappers.
+case "$(uname -s)" in
+  Darwin) JAVA_HOME_DEFAULT="/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home" ;;
+  Linux)  JAVA_HOME_DEFAULT="/usr/lib/jvm/java-17-openjdk-amd64" ;;
+esac
+export JAVA_HOME="${JAVA_HOME:-$JAVA_HOME_DEFAULT}"
 
 # --- Target: Samsung Galaxy Tab S8 FE ---------------------------------------
 # SoC: Exynos 1380 (arm64). Vulkan 1.1+. Ships Android 12, updatable to 14/15.
@@ -28,13 +40,29 @@ export ANDROID_TARGET_API="${ANDROID_TARGET_API:-34}"
 
 # --- Derived ----------------------------------------------------------------
 export ANDROID_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake"
-# Host prebuilt dir (NDK ships x86_64 host binaries; run under Rosetta on Apple Silicon).
-export ANDROID_LLVM_BIN="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/darwin-x86_64/bin"
-export ANDROID_SYSROOT="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/darwin-x86_64/sysroot"
+# Host prebuilt dir. The NDK ships x86_64 host binaries; on Apple Silicon they
+# run under Rosetta.
+export ANDROID_LLVM_BIN="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/$ANDROID_HOST_TAG/bin"
+export ANDROID_SYSROOT="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/$ANDROID_HOST_TAG/sysroot"
 
+# cmake, ninja and meson come from Homebrew on macOS, which is absent from the
+# PATH of a non-interactive shell: ssh, cron and CI all start without it, and
+# the build then dies on "cmake: command not found" far from the real cause.
+case "$(uname -s)" in
+  Darwin) PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" ;;
+  # MaterialX and USD need CMake 3.26+, newer than Ubuntu 22.04 ships. A local
+  # copy under $HOME wins over the system one when present.
+  Linux)  [ -x "$HOME/cmake/bin/cmake" ] && PATH="$HOME/cmake/bin:$PATH" ;;
+esac
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_LLVM_BIN:$PATH"
+
+for _tool in cmake ninja; do
+  command -v "$_tool" >/dev/null 2>&1 || \
+    echo "[blender-android] WARNING: $_tool not found in PATH"
+done
+unset _tool
 
 echo "[blender-android] NDK   : $ANDROID_NDK_ROOT"
 echo "[blender-android] ABI   : $ANDROID_ABI   API(min): $ANDROID_API   target: $ANDROID_TARGET_API"
 echo "[blender-android] toolch: $ANDROID_TOOLCHAIN_FILE"
-[ -f "$ANDROID_TOOLCHAIN_FILE" ] || echo "[blender-android] WARNING: toolchain file not found — check ANDROID_NDK_ROOT"
+[ -f "$ANDROID_TOOLCHAIN_FILE" ] || echo "[blender-android] WARNING: toolchain file not found - check ANDROID_NDK_ROOT"
