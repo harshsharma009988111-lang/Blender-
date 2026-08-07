@@ -18,6 +18,24 @@ set -euo pipefail
 # BSD sed requires an argument to -i and GNU sed rejects a separate one, so
 # neither spelling is portable. "-i.bak" is understood by both; the backup is
 # removed straight away.
+# Replace an ancient config.sub/config.guess pair so a cross triple is accepted.
+# Sources, in order: the distribution's own copy, then any dependency already
+# unpacked that carries a newer one.
+refresh_config_sub() {
+  local dest="$1" found=0 d
+  for d in /usr/share/misc /usr/share/automake-1.16 /usr/share/libtool/build-aux \
+           "$WORK_DIR/opus" "$WORK_DIR/lame"; do
+    if [ -f "$d/config.sub" ] && [ -f "$d/config.guess" ]; then
+      cp "$d/config.sub" "$d/config.guess" "$dest/"
+      found=1
+      break
+    fi
+  done
+  if [ "$found" -eq 0 ]; then
+    echo "[deps] WARNING: no recent config.sub found; a cross build may be rejected" >&2
+  fi
+}
+
 sed_i() {
   local file="${!#}"
   sed -i.bak "$@"
@@ -484,8 +502,11 @@ build_theora() {
   local v; v="$(dep_version THEORA_VERSION)"
   fetch "libtheora-$v.tar.bz2" "https://downloads.xiph.org/releases/theora/libtheora-$v.tar.bz2"
   local src; src="$(extract "libtheora-$v.tar.bz2" theora)"
-  # theora 1.1.1 ships a 2009 config.sub with no aarch64; refresh from opus.
-  cp "$WORK_DIR/opus/config.sub" "$WORK_DIR/opus/config.guess" "$src/" 2>/dev/null || true
+  # theora 1.1.1 ships a 2009 config.sub that rejects aarch64-linux-android.
+  # Taking it from opus only worked when opus happened to be built first, and
+  # the failure was silent, so prefer the host's copy and say so when neither
+  # source is available.
+  refresh_config_sub "$src"
   autotools_install "$src" theora --disable-static --enable-shared \
     --with-ogg="$LIBDIR/ogg" --with-vorbis="$LIBDIR/vorbis" \
     --disable-examples --disable-oggtest --disable-vorbistest
