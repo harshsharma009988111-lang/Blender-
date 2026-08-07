@@ -103,9 +103,9 @@ Order matters (leaf → up). A full run, roughly:
 zlib zstd deflate imath fmt tbb openexr png pugixml jpeg brotli freetype
 harfbuzz webp tiff openjpeg expat yamlcpp blosc pystring minizipng opencolorio
 opensubdiv robinmap openimageio embree alembic materialx potrace sqlite
-libffi openssl python openvdb ogg vorbis theora opus lame aom x265 vpx x264
-ffmpeg lzma bzip2 xml2 eigen sse2neon fribidi abseil vulkan_headers meshoptimizer
-shaderc numpy usd llvm rubberband
+libffi openssl lzma bzip2 python openvdb ogg vorbis theora opus lame aom
+x265 vpx x264 ffmpeg xml2 eigen sse2neon fribidi abseil vulkan_headers
+meshoptimizer shaderc numpy usd llvm rubberband
 ```
 
 Each installs to `../blender_build_android/lib/android_arm64/<name>`; verify with:
@@ -115,10 +115,14 @@ $ANDROID_LLVM_BIN/llvm-objdump -f ../blender_build_android/lib/android_arm64/<na
 ```
 
 Notes / gotchas (all handled by build.sh):
-- **Python** is a two-stage build (native host 3.13 → NDK cross); rebuilt after
-  lzma/bzip2 so `_lzma`/`_bz2` exist.
+- **Python** is a two-stage build (native host 3.13, then NDK cross). lzma and
+  bzip2 must exist first or the interpreter ships without `_lzma` and `_bz2`,
+  and nothing says so until Blender runs on the device. They are listed ahead
+  of it above; the earlier order relied on rebuilding Python afterwards.
 - **numpy** is cross-built with a meson cross-file + `_PYTHON_SYSCONFIGDATA_NAME`
-  pointing at the target sysconfig; needs Homebrew python 3.13 (host driver).
+  pointing at the target sysconfig. It needs a host python 3.13 matching the
+  target version: Homebrew provides one on macOS, and on a distribution that
+  ships something older it has to be built (see Prerequisites).
 - **LLVM** builds host tablegen first, then cross.
 - **USD** is built twice: once to bootstrap, then with Python support for the
   Blender `usd_hook`.
