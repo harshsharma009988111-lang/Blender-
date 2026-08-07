@@ -18,7 +18,9 @@ unset ANDROID_HOME ANDROID_NDK_ROOT ANDROID_NDK_HOME
 source "$SCRIPT_DIR/env.sh"
 cd "$REPO_ROOT"
 
-BUILD_BASE="${BUILD_BASE:-$REPO_ROOT/../blender_build_android}"
+# Canonical path: CMake records a resolved one, and comparing an unresolved
+# path against it made drop_stale_cache wipe the build dir on every run.
+BUILD_BASE="${BUILD_BASE:-$(cd "$REPO_ROOT/.." && pwd)/blender_build_android}"
 BUILD="$BUILD_BASE/build_android_$CONFIG"
 STAGE="$BUILD_BASE/android_apk_stage_$CONFIG"
 OUT="$STAGE/blender-$CONFIG.apk"
