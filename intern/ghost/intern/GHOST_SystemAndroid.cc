@@ -56,6 +56,8 @@ GHOST_SystemAndroid::GHOST_SystemAndroid()
       touch_button_down_(false),
       touch_button_(GHOST_kButtonMaskLeft),
       touch_tablet_(GHOST_TABLET_DATA_NONE),
+      hover_exit_pending_(false),
+      hover_exit_time_(0),
       touch_down_time_(0),
       touch_down_x_(0),
       touch_down_y_(0)
@@ -97,6 +99,7 @@ bool GHOST_SystemAndroid::processEvents(bool /*waitForEvent*/)
 
   /* A finger held still emits no events, so the long-press is timed here. */
   touchLongPressCheck();
+  hoverExitCheck();
 
   /* Input arrives asynchronously via the glue calling handleInputEvent(), which
    * queues GHOST events. Report whether any are pending so the window manager
@@ -313,7 +316,9 @@ int32_t GHOST_SystemAndroid::handleMotionEvent(AInputEvent *event)
    * Park it outside the window instead, which is what actually happened. Not while a
    * button is held, so losing range mid-drag doesn't fling the cursor. */
   if (hover_exit && !touch_button_down_ && !stylus_button_down_) {
-    x = y = -1;
+    hover_exit_pending_ = true;
+    hover_exit_time_ = getMilliSeconds();
+    __android_log_print(ANDROID_LOG_INFO, "blender-spen", "hover-exit at %d,%d", x, y);
   }
   cursor_x_ = x;
   cursor_y_ = y;
@@ -345,6 +350,15 @@ int32_t GHOST_SystemAndroid::handleMotionEvent(AInputEvent *event)
 
   switch (action) {
     case AMOTION_EVENT_ACTION_DOWN:
+      /* Contact followed, so the exit was the tip touching down, not a departure. */
+      __android_log_print(ANDROID_LOG_INFO,
+                          "blender-spen",
+                          "down at %d,%d stylus=%d pending_park=%d",
+                          x,
+                          y,
+                          int(is_stylus),
+                          int(hover_exit_pending_));
+      hover_exit_pending_ = false;
       if (is_stylus) {
         touchSendButton(GHOST_kButtonMaskLeft, GHOST_kEventButtonDown);
       }
@@ -391,6 +405,24 @@ void GHOST_SystemAndroid::touchSendButton(GHOST_TButton mask, GHOST_TEventType t
   touch_button_down_ = down;
   pushEvent(std::make_unique<GHOST_EventButton>(
       getMilliSeconds(), type, window_, mask, touch_tablet_));
+}
+
+void GHOST_SystemAndroid::hoverExitCheck()
+{
+  /* Long enough that a touch-down always arrives first, short enough that a
+   * tooltip does not outlive the stylus by anything noticeable. */
+  const uint64_t park_delay_ms = 100;
+  if (!hover_exit_pending_ || touch_button_down_ || stylus_button_down_) {
+    return;
+  }
+  if (getMilliSeconds() - hover_exit_time_ < park_delay_ms) {
+    return;
+  }
+  hover_exit_pending_ = false;
+  cursor_x_ = cursor_y_ = -1;
+  __android_log_print(ANDROID_LOG_INFO, "blender-spen", "parking cursor (stylus left)");
+  pushEvent(std::make_unique<GHOST_EventCursor>(
+      getMilliSeconds(), GHOST_kEventCursorMove, window_, -1, -1, GHOST_TABLET_DATA_NONE));
 }
 
 void GHOST_SystemAndroid::touchLongPressCheck()

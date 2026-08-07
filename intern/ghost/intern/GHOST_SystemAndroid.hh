@@ -109,6 +109,8 @@ class GHOST_SystemAndroid : public GHOST_System {
   /* Finger touch: the button is decided after the press, so that holding still
    * becomes a right-click while moving or a quick tap stays a left-click. */
   void touchLongPressCheck();
+  /* Parks the cursor once a stylus has really left, see hover_exit_pending_. */
+  void hoverExitCheck();
   void touchSendButton(GHOST_TButton mask, GHOST_TEventType type);
   void touchCancelPending();
   bool touch_pending_;          /* Finger down, button not decided yet. */
@@ -119,6 +121,12 @@ class GHOST_SystemAndroid : public GHOST_System {
    * mouse, normal tremor between contact and lift is read as a drag, so the
    * release never becomes a click and menu entries do not fire. */
   GHOST_TabletData touch_tablet_;
+  /* Android reports a hover exit both when the stylus leaves range and just
+   * before its tip touches down, and the two are indistinguishable at the time.
+   * Parking the cursor immediately closed any open menu before the press could
+   * land on it, so the park waits to see whether contact follows. */
+  bool hover_exit_pending_;
+  uint64_t hover_exit_time_;
   uint64_t touch_down_time_;
   int32_t touch_down_x_, touch_down_y_;
 
