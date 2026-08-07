@@ -318,7 +318,6 @@ int32_t GHOST_SystemAndroid::handleMotionEvent(AInputEvent *event)
   if (hover_exit && !touch_button_down_ && !stylus_button_down_) {
     hover_exit_pending_ = true;
     hover_exit_time_ = getMilliSeconds();
-    __android_log_print(ANDROID_LOG_INFO, "blender-spen", "hover-exit at %d,%d", x, y);
   }
   cursor_x_ = x;
   cursor_y_ = y;
@@ -351,13 +350,6 @@ int32_t GHOST_SystemAndroid::handleMotionEvent(AInputEvent *event)
   switch (action) {
     case AMOTION_EVENT_ACTION_DOWN:
       /* Contact followed, so the exit was the tip touching down, not a departure. */
-      __android_log_print(ANDROID_LOG_INFO,
-                          "blender-spen",
-                          "down at %d,%d stylus=%d pending_park=%d",
-                          x,
-                          y,
-                          int(is_stylus),
-                          int(hover_exit_pending_));
       hover_exit_pending_ = false;
       if (is_stylus) {
         touchSendButton(GHOST_kButtonMaskLeft, GHOST_kEventButtonDown);
@@ -420,7 +412,6 @@ void GHOST_SystemAndroid::hoverExitCheck()
   }
   hover_exit_pending_ = false;
   cursor_x_ = cursor_y_ = -1;
-  __android_log_print(ANDROID_LOG_INFO, "blender-spen", "parking cursor (stylus left)");
   pushEvent(std::make_unique<GHOST_EventCursor>(
       getMilliSeconds(), GHOST_kEventCursorMove, window_, -1, -1, GHOST_TABLET_DATA_NONE));
 }
