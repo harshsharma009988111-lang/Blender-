@@ -15,6 +15,16 @@
 
 set -euo pipefail
 
+# BSD sed requires an argument to -i and GNU sed rejects a separate one, so
+# neither spelling is portable. "-i.bak" is understood by both; the backup is
+# removed straight away.
+sed_i() {
+  local file="${!#}"
+  sed -i.bak "$@"
+  rm -f "$file.bak"
+}
+
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 # shellcheck source=/dev/null
@@ -293,12 +303,17 @@ build_opencolorio() {
   fetch "opencolorio-$v.tar.gz" "https://github.com/AcademySoftwareFoundation/OpenColorIO/archive/v$v.tar.gz"
   local src; src="$(extract "opencolorio-$v.tar.gz" opencolorio)"
   # Python bindings off until Python is cross-compiled; use our harvested deps.
+  # minizip-ng installs itself as libminizip.a, but OCIO's find module searches
+  # for the name minizip-ng and gives up. Point it at the file directly, which
+  # the module documents and which does not depend on the CMake version.
   cmake_install "$src" opencolorio \
     -DOCIO_INSTALL_EXT_PACKAGES=NONE \
     -DOCIO_BUILD_APPS=OFF -DOCIO_BUILD_PYTHON=OFF -DOCIO_BUILD_NUKE=OFF \
     -DOCIO_BUILD_JAVA=OFF -DOCIO_BUILD_DOCS=OFF -DOCIO_BUILD_TESTS=OFF \
     -DOCIO_BUILD_GPU_TESTS=OFF -DOCIO_USE_SSE=OFF \
-    -Dminizip-ng_ROOT="$LIBDIR/minizipng" -Dpystring_ROOT="$LIBDIR/pystring"
+    -Dminizip-ng_ROOT="$LIBDIR/minizipng" -Dpystring_ROOT="$LIBDIR/pystring" \
+    -Dminizip-ng_LIBRARY="$LIBDIR/minizipng/lib/libminizip.a" \
+    -Dminizip-ng_INCLUDE_DIR="$LIBDIR/minizipng/include/minizip"
 }
 
 build_opensubdiv() {
@@ -306,7 +321,7 @@ build_opensubdiv() {
   fetch "opensubdiv-$v.tar.gz" "https://github.com/PixarAnimationStudios/OpenSubdiv/archive/$v.tar.gz"
   local src; src="$(extract "opensubdiv-$v.tar.gz" opensubdiv)"
   # NDK ships GLES, so OpenSubdiv enables OSD_GPU with no GPU sources; gate it.
-  sed -i '' 's/if(OPENGLES_FOUND)/if(OPENGLES_FOUND AND NOT NO_OPENGL)/' \
+  sed_i 's/if(OPENGLES_FOUND)/if(OPENGLES_FOUND AND NOT NO_OPENGL)/' \
     "$src/CMakeLists.txt"
   # Its ANDROID block installs Android.mk to LIBRARY_OUTPUT_PATH_ROOT; set it.
   # Blender's GPU subdiv needs glslPatchShaderSource (a source-string
@@ -433,7 +448,7 @@ EOF
     make -j"$(sysctl -n hw.ncpu)" && make install )
   unset CC CXX AR RANLIB READELF CONFIG_SITE CPPFLAGS LDFLAGS PKG_CONFIG_LIBDIR
   # The cross-built .pc leaves $(BLDLIBRARY) unexpanded; resolve it.
-  sed -i '' 's/\$(BLDLIBRARY)/-lpython3.13/' "$LIBDIR/python/lib/pkgconfig/python-$mm.pc"
+  sed_i 's/\$(BLDLIBRARY)/-lpython3.13/' "$LIBDIR/python/lib/pkgconfig/python-$mm.pc"
   echo "[deps] installed python -> $LIBDIR/python"
 }
 
@@ -497,7 +512,7 @@ build_x265() {
   fetch "x265_$v.tar.gz" "https://bitbucket.org/multicoreware/x265_git/downloads/x265_$v.tar.gz"
   local src; src="$(extract "x265_$v.tar.gz" x265)"
   # CMake 4 dropped OLD for CMP0025/CMP0054; x265 forces them.
-  sed -i '' -E 's/cmake_policy\(SET (CMP0025|CMP0054) OLD\)/cmake_policy(SET \1 NEW)/' \
+  sed_i -E 's/cmake_policy\(SET (CMP0025|CMP0054) OLD\)/cmake_policy(SET \1 NEW)/' \
     "$src/source/CMakeLists.txt"
   # ENABLE_ASSEMBLY off: x265's arm path passes -mcpu=armv8-a which clang
   # rejects as a CPU name. Functional without asm (slower HEVC encode).
@@ -615,7 +630,7 @@ build_usd() {
   # Blender's patch removes the Boost dependency.
   patch -p1 -d "$src" < "$REPO_ROOT/build_files/build_environment/patches/usd_noboost.diff"
   # Android uses libc++ (no __gnu_cxx); don't enable GNU STL extensions there.
-  sed -i '' 's/#if defined(ARCH_OS_LINUX) \&\& defined(ARCH_COMPILER_GCC)/#if defined(ARCH_OS_LINUX) \&\& defined(ARCH_COMPILER_GCC) \&\& !defined(__ANDROID__)/' \
+  sed_i 's/#if defined(ARCH_OS_LINUX) \&\& defined(ARCH_COMPILER_GCC)/#if defined(ARCH_OS_LINUX) \&\& defined(ARCH_COMPILER_GCC) \&\& !defined(__ANDROID__)/' \
     "$src/pxr/base/arch/defines.h"
   cmake_install "$src" usd \
     -DPXR_BUILD_MONOLITHIC=ON \
