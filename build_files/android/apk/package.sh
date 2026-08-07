@@ -79,6 +79,14 @@ PAYLOAD="$STAGE/payload"
 mkdir -p "$ASSETS" "$PAYLOAD/python/lib"
 cp -R "$REPO_ROOT/release/datafiles" "$PAYLOAD/datafiles"
 cp -R "$REPO_ROOT/scripts" "$PAYLOAD/scripts"
+
+# Cycles registers itself from Python, and that half lives outside scripts/ --
+# CMake only puts it in place during install, which this packaging path skips.
+# Without it the engine is linked in but never appears in the render engine list.
+if grep -q "set(WITH_CYCLES ON" "$REPO_ROOT/build_files/android/android_features_$CONFIG.cmake"; then
+  cp -R "$REPO_ROOT/intern/cycles/blender/addon" "$PAYLOAD/scripts/addons_core/cycles"
+  echo "[apk] bundled the Cycles add-on"
+fi
 cp -R "$LIBDIR/python/lib/python3.13" "$PAYLOAD/python/lib/python3.13"
 find "$PAYLOAD" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
 
