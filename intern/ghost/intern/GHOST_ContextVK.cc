@@ -229,6 +229,8 @@ class GHOST_DeviceVK {
   VkPhysicalDeviceFeatures2 features = {};
   VkPhysicalDeviceVulkan11Features features_11 = {};
   VkPhysicalDeviceVulkan12Features features_12 = {};
+  /* Only queried on a 1.3 device: asking for it on an older one is invalid. */
+  VkPhysicalDeviceVulkan13Features features_13 = {};
   VkPhysicalDeviceRobustness2FeaturesEXT features_robustness2 = {
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT};
   VkPhysicalDeviceAccelerationStructureFeaturesKHR features_acceleration_structure = {
@@ -257,6 +259,15 @@ class GHOST_DeviceVK {
     features_11.pNext = &features_12;
     features_12.pNext = &features_robustness2;
     features_robustness2.pNext = &features_acceleration_structure;
+
+    /* Dynamic rendering is core from 1.3 on, and a driver that has it in core stops
+     * advertising the extension. Without this the feature is invisible on exactly
+     * the devices that support it best. */
+    if (properties.properties.apiVersion >= VK_API_VERSION_1_3) {
+      features_13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+      features_13.pNext = features_12.pNext;
+      features_12.pNext = &features_13;
+    }
 
     volk::vkGetPhysicalDeviceFeatures2(vk_physical_device, &features);
     init_extensions();
@@ -386,6 +397,23 @@ struct GHOST_InstanceVK {
 
   bool create_instance(uint32_t vulkan_api_version)
   {
+    /* vkGetDeviceProcAddr returns nothing for core commands newer than the version
+     * declared here, whatever the physical device supports. Asking for 1.2 left
+     * vkCmdBeginRendering null on a 1.3 device, so dynamic rendering could not be
+     * used on the very devices that have it in core. Extensions are unaffected,
+     * which is why the KHR path on older devices never showed this. */
+    uint32_t loader_api_version = VK_API_VERSION_1_0;
+    if (volk::vkEnumerateInstanceVersion != nullptr &&
+        volk::vkEnumerateInstanceVersion(&loader_api_version) == VK_SUCCESS)
+    {
+      const uint32_t highest_known = loader_api_version < uint32_t(VK_API_VERSION_1_3) ?
+                                         loader_api_version :
+                                         uint32_t(VK_API_VERSION_1_3);
+      if (highest_known > vulkan_api_version) {
+        vulkan_api_version = highest_known;
+      }
+    }
+
     VkApplicationInfo vk_application_info = {VK_STRUCTURE_TYPE_APPLICATION_INFO,
                                              nullptr,
                                              "Blender",
@@ -677,7 +705,14 @@ struct GHOST_InstanceVK {
     VkPhysicalDeviceDynamicRenderingFeatures dynamic_rendering = {};
     dynamic_rendering.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
     dynamic_rendering.dynamicRendering = VK_TRUE;
-    if (device.extensions.is_enabled(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME)) {
+    /* Either route enables the same feature: the extension on 1.1/1.2 devices, and
+     * the promoted core feature on 1.3 ones, where the extension is not offered. */
+    const bool core_dynamic_rendering = device.properties.properties.apiVersion >=
+                                            VK_API_VERSION_1_3 &&
+                                        device.features_13.dynamicRendering;
+    if (device.extensions.is_enabled(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME) ||
+        core_dynamic_rendering)
+    {
       feature_struct_ptr.push_back(&dynamic_rendering);
     }
 

@@ -661,12 +661,14 @@ void VKBackend::detect_workarounds(VKDevice &device)
   extensions.multi_viewport = device.physical_device_features_get().multiViewport;
   extensions.fragment_shader_barycentric = device.supports_extension(
       VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
-  /* Core in Vulkan 1.3 but still advertised as an extension by all current
-   * drivers that support it. When absent (Vulkan 1.1 mobile GPUs such as the
-   * Adreno 642L) the backend uses the render-pass fallback. Kept extension-based
-   * to stay in lock-step with GHOST_ContextVK device creation. */
-  extensions.dynamic_rendering = device.supports_extension(
-      VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+  /* Core in Vulkan 1.3, and a driver that has it in core no longer advertises the
+   * extension, so testing only for the extension turned it off on the devices that
+   * support it best. Vulkan 1.1 mobile GPUs (Adreno 642L) have neither and keep
+   * using the render-pass fallback. Must stay in lock-step with the feature
+   * GHOST_ContextVK actually enables at device creation. */
+  extensions.dynamic_rendering =
+      device.supports_extension(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME) ||
+      device.physical_device_properties_get().apiVersion >= VK_API_VERSION_1_3;
   /* The feature has to be enabled on the device, which being core in Vulkan 1.2 or having the
    * extension present does not imply. Read back what was actually enabled. */
   extensions.separate_depth_stencil_layouts =

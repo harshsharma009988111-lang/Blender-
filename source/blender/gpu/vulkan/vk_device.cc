@@ -170,6 +170,8 @@ void VKDevice::init(GHOST_IContext *ghost_context)
   VK_ALIAS_CORE_KHR(vkGetBufferDeviceAddress);
   VK_ALIAS_CORE_KHR(vkGetBufferOpaqueCaptureAddress);
   VK_ALIAS_CORE_KHR(vkGetDeviceMemoryOpaqueCaptureAddress);
+  VK_ALIAS_CORE_KHR(vkCmdBeginRendering);
+  VK_ALIAS_CORE_KHR(vkCmdEndRendering);
 #undef VK_ALIAS_CORE_KHR
 
   init_physical_device_extensions();

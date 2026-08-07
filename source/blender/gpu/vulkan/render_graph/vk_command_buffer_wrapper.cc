@@ -310,14 +310,14 @@ void VKCommandBufferWrapper::set_vertex_input(
 
 void VKCommandBufferWrapper::begin_rendering(const VkRenderingInfo *p_rendering_info)
 {
-  BLI_assert(functions->vkCmdBeginRenderingKHR);
-  functions->vkCmdBeginRenderingKHR(vk_command_buffer_, p_rendering_info);
+  BLI_assert(functions->vkCmdBeginRendering);
+  functions->vkCmdBeginRendering(vk_command_buffer_, p_rendering_info);
 }
 
 void VKCommandBufferWrapper::end_rendering()
 {
-  BLI_assert(functions->vkCmdEndRenderingKHR);
-  functions->vkCmdEndRenderingKHR(vk_command_buffer_);
+  BLI_assert(functions->vkCmdEndRendering);
+  functions->vkCmdEndRendering(vk_command_buffer_);
 }
 
 void VKCommandBufferWrapper::begin_render_pass(VkRenderPass vk_render_pass,
