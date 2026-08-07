@@ -15,14 +15,19 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 source "$REPO_ROOT/build_files/android/env.sh"
 
 CONFIG="${BLENDER_ANDROID_CONFIG:-full}"
-BUILD_BASE="${BUILD_BASE:-$REPO_ROOT/../blender_build_android}"
+# Canonical path: CMake records a resolved one, and comparing an unresolved
+# path against it made drop_stale_cache wipe the build dir on every run.
+BUILD_BASE="${BUILD_BASE:-$(cd "$REPO_ROOT/.." && pwd)/blender_build_android}"
 : "${LIBDIR:=$BUILD_BASE/lib/android_arm64}"
 BUILD="${BUILD:-$BUILD_BASE/build_android_$CONFIG}"
 BT="$ANDROID_HOME/build-tools/35.0.1"
 ANDROID_JAR="$ANDROID_HOME/platforms/android-35/android.jar"
-STAGE="$BUILD_BASE/android_apk_stage_$CONFIG"
+# Flavours differ only in what gets packaged, so they share a build tree but
+# need their own stage and output name.
+FLAVOUR="${BLENDER_ANDROID_FLAVOUR:-}"
+STAGE="$BUILD_BASE/android_apk_stage_$CONFIG$FLAVOUR"
 JNI="$STAGE/lib/arm64-v8a"
-OUT="$STAGE/blender-$CONFIG.apk"
+OUT="$STAGE/blender-$CONFIG$FLAVOUR.apk"
 
 rm -rf "$STAGE"; mkdir -p "$JNI"
 
@@ -32,6 +37,27 @@ cp "$ANDROID_SYSROOT/usr/lib/aarch64-linux-android/libc++_shared.so" "$JNI/"
 
 # libadrenotools loads its hooks by name from the native library directory, so they
 # have to ship in the APK for the Turnip driver path to work.
+# Mesa Turnip, loaded from the APK so a release build can use it too. Android only
+# extracts native libraries named lib*.so, and the soname must match the file name.
+TURNIP="$LIBDIR/turnip/lib/libvulkan_turnip.so"
+# Shipping the driver is what turns Turnip on at runtime, so only the Turnip
+# flavour of the APK may carry it.
+if [ "${BLENDER_ANDROID_TURNIP:-0}" = "1" ] && [ -f "$TURNIP" ]; then
+  cp "$TURNIP" "$JNI/"
+  patchelf --set-soname libvulkan_turnip.so "$JNI/libvulkan_turnip.so"
+
+  # The driver links two private platform libraries that an app namespace does
+  # not expose, so it cannot be dlopened without stand-ins alongside it.
+  SHIM_SRC="$SCRIPT_DIR/../turnip_shim/shim.c"
+  CLANG="$ANDROID_LLVM_BIN/aarch64-linux-android$ANDROID_API-clang"
+  for part in CUTILS:libcutils.so HARDWARE:libhardware.so; do
+    out="${part#*:}"
+    "$CLANG" -shared -fPIC -O2 -DSHIM_"${part%%:*}" -o "$JNI/$out" "$SHIM_SRC" \
+      -Wl,-soname,"$out"
+  done
+  echo "[apk] bundled Mesa Turnip driver + platform shims"
+fi
+
 if [ -d "$LIBDIR/adrenotools/hooks" ]; then
   cp "$LIBDIR"/adrenotools/hooks/*.so "$JNI/"
   echo "[apk] bundled adrenotools hooks (Turnip support)"
@@ -122,7 +148,14 @@ mkdir -p "$STAGE/rescompiled"
 "$BT/aapt2" compile --dir "$RES_SRC" -o "$STAGE/rescompiled/res.zip"
 
 echo "[apk] linking resources"
-"$BT/aapt2" link -o "$STAGE/base.apk" -I "$ANDROID_JAR" \
+# The manifest is not debuggable, so a distributed APK never is by accident.
+# Debug builds ask for it here; needed to attach validation layers or a debugger.
+AAPT_DEBUG=""
+if [ -n "${BLENDER_ANDROID_DEBUGGABLE:-}" ]; then
+  AAPT_DEBUG="--debug-mode"
+  echo "[apk] debuggable build"
+fi
+"$BT/aapt2" link -o "$STAGE/base.apk" -I "$ANDROID_JAR" $AAPT_DEBUG \
   --manifest "$SCRIPT_DIR/app/src/main/AndroidManifest.xml" \
   -R "$STAGE/rescompiled/res.zip" \
   -A "$ASSETS" -0 zip \

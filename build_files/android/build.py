@@ -88,12 +88,16 @@ def adb(args: list[str], serial: str | None, **kwargs) -> subprocess.CompletedPr
     return run(cmd, **kwargs)
 
 
-def stage_dir(config: str) -> Path:
-    return BUILD_BASE / f"android_apk_stage_{config}"
+def flavour(turnip: bool) -> str:
+    return "-turnip" if turnip else ""
 
 
-def apk_path(config: str) -> Path:
-    return stage_dir(config) / f"blender-{config}.apk"
+def stage_dir(config: str, turnip: bool = False) -> Path:
+    return BUILD_BASE / f"android_apk_stage_{config}{flavour(turnip)}"
+
+
+def apk_path(config: str, turnip: bool = False) -> Path:
+    return stage_dir(config, turnip) / f"blender-{config}{flavour(turnip)}.apk"
 
 
 def clean(config: str) -> None:
@@ -120,7 +124,8 @@ def pending_edges(config: str) -> int:
     return sum(1 for line in out.splitlines() if "Building" in line or "Linking" in line)
 
 
-def build(config: str, repackage: bool = False, debuggable: bool = False) -> None:
+def build(config: str, repackage: bool = False, debuggable: bool = False,
+          turnip: bool = False) -> None:
     """Recompile, and repackage only as much as the change requires.
 
     Three paths, cheapest first. Only libblender.so usually changes, so reusing
@@ -129,11 +134,15 @@ def build(config: str, repackage: bool = False, debuggable: bool = False) -> Non
     in the APK, not in the compiled code, so they need repackaging but never a
     reconfigure -- forcing one used to turn a flag change into a full rebuild.
     """
-    stage = stage_dir(config)
+    stage = stage_dir(config, turnip)
     build_dir = BUILD_BASE / f"build_android_{config}"
     configured = (build_dir / "build.ninja").exists()
     staged = (stage / "base.apk").exists() and (stage / "lib/arm64-v8a/libblender.so").exists()
     env = "BLENDER_ANDROID_DEBUGGABLE=1 " if debuggable else ""
+    if turnip:
+        # fastdeploy has no notion of flavours, so a Turnip build always repackages.
+        env += f"BLENDER_ANDROID_TURNIP=1 BLENDER_ANDROID_FLAVOUR={flavour(True)} "
+        repackage = True
 
     stale = pending_edges(config)
     if stale >= 0:
@@ -250,6 +259,9 @@ def main() -> int:
                         help="drop the on-device shader and pipeline caches")
     parser.add_argument("--enable-validation-layers", action="store_true")
     parser.add_argument("--disable-validation-layers", action="store_true")
+    parser.add_argument("--turnip", action="store_true",
+                        help="bundle Mesa Turnip in the APK; its presence is what "
+                             "selects the driver at runtime")
     parser.add_argument("--enable-turnip", action="store_true",
                         help="run on Mesa Turnip instead of the vendor driver")
     parser.add_argument("--disable-turnip", action="store_true")
@@ -265,10 +277,11 @@ def main() -> int:
         debuggable = args.validation or args.debuggable
         build(args.config,
               repackage=args.repackage or args.clean or debuggable,
-              debuggable=debuggable)
+              debuggable=debuggable,
+              turnip=args.turnip)
         if args.validation:
             inject_validation_layer(args.config)
-        print(f"APK: {apk_path(args.config)}")
+        print(f"APK: {apk_path(args.config, args.turnip)}")
 
     if args.install:
         if not args.config:

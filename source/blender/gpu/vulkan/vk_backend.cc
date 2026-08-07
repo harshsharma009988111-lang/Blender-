@@ -17,6 +17,7 @@
 #  include <dlfcn.h>
 #  include <string>
 #  include <sys/system_properties.h>
+#  include <unistd.h>
 #endif
 
 #include "BLI_path_utils.hh"
@@ -254,17 +255,16 @@ static void vk_restrict_loader_layers()
 
 #ifdef WITH_ADRENOTOOLS
 /**
- * Load Mesa Turnip in place of the vendor driver. The hook libraries must live in the app's
- * nativeLibraryDir (derived from our own library's path) and the driver itself must sit on
- * internal storage, as dlopen refuses libraries from world-writable locations.
+ * Load Mesa Turnip in place of the vendor driver.
+ *
+ * Both the hook libraries and the driver ship in the app's nativeLibraryDir,
+ * derived from our own library's path. Going through adrenotools rather than
+ * opening the driver directly keeps the platform loader in the chain, and the
+ * loader is what implements VK_KHR_swapchain -- a driver reached on its own
+ * exposes no WSI at all.
  */
 static bool android_try_load_turnip()
 {
-  char prop[PROP_VALUE_MAX] = {};
-  if (__system_property_get("debug.blender.turnip", prop) <= 0 || atoi(prop) == 0) {
-    return false;
-  }
-
   Dl_info info = {};
   if (dladdr(reinterpret_cast<const void *>(&android_try_load_turnip), &info) == 0 ||
       info.dli_fname == nullptr)
@@ -278,8 +278,31 @@ static bool android_try_load_turnip()
   }
   native_lib_dir.resize(slash + 1);
 
-  const char *driver_dir = "/data/data/org.blender.blender/files/turnip/";
-  const char *driver_name = "vulkan.ad07xx.so";
+  const char *driver_dir = native_lib_dir.c_str();
+  const char *driver_name = "libvulkan_turnip.so";
+  const std::string driver_path = native_lib_dir + driver_name;
+
+  /* Only the Turnip flavour of the APK ships the driver, so its presence is what
+   * selects it. A build cannot be told apart at runtime any other way, and users
+   * installing a release have no means of setting a property. */
+  char prop[PROP_VALUE_MAX] = {};
+  const bool use_turnip = (__system_property_get("debug.blender.turnip", prop) > 0) ?
+                              (atoi(prop) != 0) :
+                              (access(driver_path.c_str(), R_OK) == 0);
+  if (!use_turnip) {
+    return false;
+  }
+
+  /* Tiled rendering faults the GPU on a7xx within a second or two of the first
+   * frame, so draw straight to system memory instead. Mesa reads its tunables
+   * from the environment before system properties, and an app may not read the
+   * vendor.* ones, which makes this the only way to reach them in-process. */
+  char tu_debug[PROP_VALUE_MAX] = {};
+  if (__system_property_get("debug.blender.tu_debug", tu_debug) <= 0) {
+    BLI_strncpy(tu_debug, "sysmem", sizeof(tu_debug));
+  }
+  setenv("TU_DEBUG", tu_debug, 1);
+  __android_log_print(ANDROID_LOG_INFO, "blender-turnip", "TU_DEBUG=%s", tu_debug);
 
   void *libvulkan = adrenotools_open_libvulkan(RTLD_NOW,
                                                ADRENOTOOLS_DRIVER_CUSTOM,
