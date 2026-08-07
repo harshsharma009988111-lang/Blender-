@@ -107,20 +107,53 @@ def clean(config: str) -> None:
             shutil.rmtree(path)
 
 
-def build(config: str, repackage: bool = False) -> None:
-    """Recompile and repackage.
+def pending_edges(config: str) -> int:
+    """How much ninja thinks is stale, so a surprise full rebuild is visible."""
+    build_dir = BUILD_BASE / f"build_android_{config}"
+    if not (build_dir / "build.ninja").exists():
+        return -1
+    try:
+        out = subprocess.run(["bash", "-lc", f"ninja -C '{build_dir}' -n blender"],
+                             check=True, capture_output=True, text=True).stdout
+    except subprocess.CalledProcessError:
+        return -1
+    return sum(1 for line in out.splitlines() if "Building" in line or "Linking" in line)
 
-    Once a config has been packaged, only libblender.so normally changes, so
-    reuse the staged runtime payload instead of rebuilding the 61 MB asset zip
-    and re-gathering every native library. That is minutes versus seconds.
+
+def build(config: str, repackage: bool = False, debuggable: bool = False) -> None:
+    """Recompile, and repackage only as much as the change requires.
+
+    Three paths, cheapest first. Only libblender.so usually changes, so reusing
+    the staged runtime payload saves rebuilding a 61 MB asset zip and
+    re-gathering every native library. Debuggability and the bundled layer live
+    in the APK, not in the compiled code, so they need repackaging but never a
+    reconfigure -- forcing one used to turn a flag change into a full rebuild.
     """
     stage = stage_dir(config)
-    can_fast = (stage / "base.apk").exists() and (stage / "lib/arm64-v8a/libblender.so").exists()
-    if can_fast and not repackage:
-        # fastdeploy installs and launches at the end; build.py owns that.
-        sh(f"FASTDEPLOY_NO_INSTALL=1 '{SCRIPT_DIR / 'fastdeploy.sh'}' {config}")
+    build_dir = BUILD_BASE / f"build_android_{config}"
+    configured = (build_dir / "build.ninja").exists()
+    staged = (stage / "base.apk").exists() and (stage / "lib/arm64-v8a/libblender.so").exists()
+    env = "BLENDER_ANDROID_DEBUGGABLE=1 " if debuggable else ""
+
+    stale = pending_edges(config)
+    if stale >= 0:
+        print(f"[build] {stale} ninja edge(s) stale")
+        if stale > 500:
+            print(f"[build] WARNING: that is a large rebuild for an incremental change. "
+                  f"A corrupt {build_dir}/.ninja_deps forces this; delete it to reset.")
+
+    if not configured:
+        print("[build] path: full (configure + compile + package)")
+        sh(f"{env}'{SCRIPT_DIR / 'build_apk.sh'}' {config}")
+    elif repackage or not staged:
+        print("[build] path: compile + repackage (no reconfigure)")
+        sh(f"ninja -C '{build_dir}' blender")
+        sh(f"{env}BLENDER_ANDROID_CONFIG={config} BUILD='{build_dir}' "
+           f"bash '{SCRIPT_DIR / 'apk' / 'package.sh'}'")
     else:
-        sh(f"'{SCRIPT_DIR / 'build_apk.sh'}' {config}")
+        print("[build] path: fast (compile + swap libblender.so)")
+        # fastdeploy installs and launches at the end; build.py owns that.
+        sh(f"{env}FASTDEPLOY_NO_INSTALL=1 '{SCRIPT_DIR / 'fastdeploy.sh'}' {config}")
 
 
 def fetch_validation_layer() -> Path:
@@ -207,7 +240,10 @@ def main() -> int:
                         help="rebuild the runtime payload too; needed when scripts, "
                              "datafiles or the dependency set change")
     parser.add_argument("--validation", action="store_true",
-                        help="bundle the Khronos validation layer into the APK")
+                        help="bundle the Khronos validation layer into the APK; implies "
+                             "--debuggable, which the layer loader requires")
+    parser.add_argument("--debuggable", action="store_true",
+                        help="mark the APK debuggable; never do this for a release")
     parser.add_argument("--install", action="store_true", help="adb install the APK")
     parser.add_argument("--run", action="store_true", help="launch after installing")
     parser.add_argument("--clear-caches", action="store_true",
@@ -225,7 +261,11 @@ def main() -> int:
     if args.config:
         if args.clean:
             clean(args.config)
-        build(args.config, repackage=args.repackage or args.clean)
+        # A validation build has to be repackaged: base.apk carries the manifest.
+        debuggable = args.validation or args.debuggable
+        build(args.config,
+              repackage=args.repackage or args.clean or debuggable,
+              debuggable=debuggable)
         if args.validation:
             inject_validation_layer(args.config)
         print(f"APK: {apk_path(args.config)}")
