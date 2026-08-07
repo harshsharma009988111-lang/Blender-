@@ -12,7 +12,8 @@ Blender
 > - Ready-made APKs: [Releases](https://github.com/simfeo/blender/releases)
 > - Building from source: [build_files/android/BUILDING.md](build_files/android/BUILDING.md)
 > - Requires a GPU whose Vulkan driver meets Blender's minimum feature set.
->   Adreno and Xclipse are tested; Mali is currently rejected at startup.
+> - Tested on a Samsung Galaxy Tab S7 FE (Adreno 642L, Vulkan 1.1) and a
+>   Galaxy S22 Ultra SM-S908B (Xclipse 920, Vulkan 1.3).
 >
 > Everything below is the upstream Blender read-me.
 
