@@ -13,9 +13,9 @@ Target: Android 12+ (minSdk 31), built against Android 14 (targetSdk 34).
 Two feature sets, selected with `-DBLENDER_ANDROID_CONFIG=full|lite` (default
 `full`):
 
-- **full** — everything: Cycles (+embree), USD, MaterialX, OpenVDB, Alembic,
+- **full** - everything: Cycles (+embree), USD, MaterialX, OpenVDB, Alembic,
   LLVM, ffmpeg video codecs. For modern Qualcomm/Exynos flagships.
-- **lite** — those heavy features off; core modelling/sculpt/Python only. For
+- **lite** - those heavy features off; core modelling/sculpt/Python only. For
   weaker devices and a much smaller APK.
 
 The feature toggles live in `build_files/android/android_features_{common,full,
@@ -61,13 +61,13 @@ sdkmanager "ndk;28.2.13676358" "platform-tools" \
 ```
 
 The environment (NDK path, ABI, API levels) lives in
-`build_files/android/env.sh` — everything below sources it.
+`build_files/android/env.sh` - everything below sources it.
 
 ---
 
 ## 1. Get the sources (LFS + submodule)
 
-The GitHub repo is a mirror without LFS/submodule content — use
+The GitHub repo is a mirror without LFS/submodule content - use
 projects.blender.org:
 
 ```bash
@@ -211,10 +211,10 @@ only. The layer is downloaded once and cached in
 
 Two messages are expected on a Vulkan 1.1 Adreno device and are not bugs:
 
-- `WARNING-Swapchain-PreTransform` — the swap-chain deliberately requests an
+- `WARNING-Swapchain-PreTransform` - the swap-chain deliberately requests an
   IDENTITY `preTransform` so the compositor performs the rotation; Blender does
   not pre-rotate its rendering.
-- `Undefined-Value-ShaderOutputNotConsumed` — a depth-only pass whose fragment
+- `Undefined-Value-ShaderOutputNotConsumed` - a depth-only pass whose fragment
   shader still declares a colour output. The write is discarded.
 
 ### Turnip (Mesa) driver
@@ -222,7 +222,7 @@ Two messages are expected on a Vulkan 1.1 Adreno device and are not bugs:
 Loads Mesa's Turnip in place of the vendor driver through `libadrenotools`,
 which provides `VK_KHR_dynamic_rendering` on devices whose vendor driver is
 Vulkan 1.1 only, bypassing the render-pass fallback. Selected at runtime, so no
-separate build is needed — but the Turnip driver must be present on the device.
+separate build is needed - but the Turnip driver must be present on the device.
 
 ```bash
 build_files/android/build.py --enable-turnip
