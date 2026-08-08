@@ -15,9 +15,6 @@
 
 set -euo pipefail
 
-# BSD sed requires an argument to -i and GNU sed rejects a separate one, so
-# neither spelling is portable. "-i.bak" is understood by both; the backup is
-# removed straight away.
 # Replace an ancient config.sub/config.guess pair so a cross triple is accepted.
 # Sources, in order: the distribution's own copy, then any dependency already
 # unpacked that carries a newer one.
@@ -52,6 +49,9 @@ host_python() {
   return 1
 }
 
+# BSD sed requires an argument to -i and GNU sed rejects a separate one, so
+# neither spelling is portable. "-i.bak" is understood by both; the backup is
+# removed straight away.
 sed_i() {
   local file="${!#}"
   sed -i.bak "$@"
@@ -66,7 +66,11 @@ source "$REPO_ROOT/build_files/android/env.sh"
 
 # All Android build artifacts live under this sibling dir, not scattered in the
 # repo's parent. Override with BUILD_BASE=... if you keep them elsewhere.
-BUILD_BASE="${BUILD_BASE:-$REPO_ROOT/../blender_build_android}"
+# Resolved, not "$REPO_ROOT/..": the unresolved form reaches compiler flags and
+# CMake caches, where the same directory then appears under two spellings and is
+# treated as two. The same slip made the APK scripts wipe their build directory
+# on every run.
+BUILD_BASE="${BUILD_BASE:-$(cd "$REPO_ROOT/.." && pwd)/blender_build_android}"
 : "${LIBDIR:=$BUILD_BASE/lib/android_$( [ "$ANDROID_ABI" = arm64-v8a ] && echo arm64 || echo "$ANDROID_ABI")}"
 DL_DIR="$BUILD_BASE/android_deps_build/downloads"
 WORK_DIR="$BUILD_BASE/android_deps_build/work"
@@ -951,9 +955,20 @@ ALL_DEPS=(
   abseil vulkan_headers meshoptimizer shaderc numpy usd llvm rubberband
 )
 
+# Where a dependency lands, when that differs from its name. Without this the
+# skip check never matches and the package is rebuilt on every run.
+dep_install_dir() {
+  case "$1" in
+    numpy)          echo "$LIBDIR/python/lib/python3.13/site-packages/numpy" ;;
+    vulkan_headers) echo "$LIBDIR/vulkan" ;;
+    *)              echo "$LIBDIR/$1" ;;
+  esac
+}
+
 # A dependency counts as built when its install directory has something in it.
 dep_is_built() {
-  [ -d "$LIBDIR/$1" ] && [ -n "$(ls -A "$LIBDIR/$1" 2>/dev/null)" ]
+  local d; d="$(dep_install_dir "$1")"
+  [ -d "$d" ] && [ -n "$(ls -A "$d" 2>/dev/null)" ]
 }
 
 # Catch a library that silently came out for the host instead of the target.
