@@ -36,6 +36,22 @@ refresh_config_sub() {
   fi
 }
 
+# Host interpreter matching the target Python version. Needed to drive the numpy
+# cross-build and to give USD Python support. Homebrew has it on macOS; on Linux
+# a distribution package is usually too old, so a local build is used instead.
+host_python() {
+  local p
+  for p in /opt/homebrew/bin/python3.13 "$HOME/python313/bin/python3.13" \
+           /usr/local/bin/python3.13 "$(command -v python3.13 2>/dev/null)"; do
+    if [ -n "$p" ] && [ -x "$p" ]; then
+      echo "$p"
+      return 0
+    fi
+  done
+  echo "[deps] ERROR: no host python3.13 found; see Prerequisites in BUILDING.md" >&2
+  return 1
+}
+
 sed_i() {
   local file="${!#}"
   sed -i.bak "$@"
@@ -650,13 +666,18 @@ build_usd() {
   local src; src="$(extract "openusd-$v.tar.gz" usd)"
   # Blender's patch removes the Boost dependency.
   patch -p1 -d "$src" < "$REPO_ROOT/build_files/build_environment/patches/usd_noboost.diff"
+  # The monolithic library carries the Python bindings, so it has to link
+  # libpython. Setting Python3_LIBRARY alone is not enough: whether FindPython3
+  # puts it on the link line differs between CMake 3.x and 4.x, and with 3.x the
+  # build ends in a wall of undefined CPython symbols. Naming it for the linker
+  # works either way.
   # Android uses libc++ (no __gnu_cxx); don't enable GNU STL extensions there.
   sed_i 's/#if defined(ARCH_OS_LINUX) \&\& defined(ARCH_COMPILER_GCC)/#if defined(ARCH_OS_LINUX) \&\& defined(ARCH_COMPILER_GCC) \&\& !defined(__ANDROID__)/' \
     "$src/pxr/base/arch/defines.h"
   cmake_install "$src" usd \
     -DPXR_BUILD_MONOLITHIC=ON \
     -DPXR_ENABLE_PYTHON_SUPPORT=ON -DPXR_USE_PYTHON_3=ON \
-    -DPython3_EXECUTABLE=/opt/homebrew/bin/python3.13 \
+    -DPython3_EXECUTABLE="$(host_python)" \
     -DPython3_INCLUDE_DIR="$LIBDIR/python/include/python3.13" \
     -DPython3_LIBRARY="$LIBDIR/python/lib/libpython3.13.so" \
     -DPXR_BUILD_IMAGING=ON -DPXR_ENABLE_GL_SUPPORT=OFF \
@@ -666,7 +687,8 @@ build_usd() {
     -DPXR_BUILD_TESTS=OFF -DPXR_BUILD_EXAMPLES=OFF -DPXR_BUILD_TUTORIALS=OFF \
     -DPXR_BUILD_USDVIEW=OFF -DPXR_BUILD_USD_TOOLS=OFF \
     -DTBB_ROOT="$LIBDIR/tbb" \
-    -DCMAKE_CXX_FLAGS="-DNOFILE=1024 -D__environ=environ"
+    -DCMAKE_CXX_FLAGS="-DNOFILE=1024 -D__environ=environ" \
+    -DCMAKE_SHARED_LINKER_FLAGS="-L$LIBDIR/python/lib -lpython3.13"
 }
 
 build_eigen() {
@@ -802,7 +824,7 @@ build_numpy() {
   local src; src="$(extract "numpy-$v.tar.gz" numpy)"
 
   # A host python 3.13 with pip drives the cross-build.
-  local host_py=/opt/homebrew/bin/python3.13
+  local host_py; host_py="$(host_python)"
   local venv="$WORK_DIR/numpy-buildenv"
   if [ ! -x "$venv/bin/python" ]; then
     "$host_py" -m venv "$venv"
@@ -917,16 +939,63 @@ build_openexr() {
     -DOPENEXR_BUILD_EXAMPLES=OFF
 }
 
-main() {
-  [ $# -gt 0 ] || { echo "usage: $0 <dep> [dep...] | all" >&2; exit 1; }
-  local targets=("$@")
-  if [ "${1:-}" = all ]; then
-    targets=(zlib zstd deflate)
+# Dependency order, leaf first. This is a build order, not an alphabetical list:
+# lzma and bzip2 come before python so the interpreter picks up _lzma and _bz2,
+# and every consumer follows the libraries it links against.
+ALL_DEPS=(
+  zlib zstd deflate imath fmt tbb openexr png pugixml jpeg brotli freetype
+  harfbuzz webp tiff openjpeg expat yamlcpp blosc pystring minizipng
+  opencolorio opensubdiv robinmap openimageio embree alembic materialx
+  potrace sqlite libffi openssl lzma bzip2 python openvdb ogg vorbis
+  theora opus lame aom x265 vpx x264 ffmpeg xml2 eigen sse2neon fribidi
+  abseil vulkan_headers meshoptimizer shaderc numpy usd llvm rubberband
+)
+
+# A dependency counts as built when its install directory has something in it.
+dep_is_built() {
+  [ -d "$LIBDIR/$1" ] && [ -n "$(ls -A "$LIBDIR/$1" 2>/dev/null)" ]
+}
+
+# Catch a library that silently came out for the host instead of the target.
+dep_check_arch() {
+  local lib
+  lib=$(ls "$LIBDIR/$1"/lib/*.so "$LIBDIR/$1"/lib/*.a 2>/dev/null | head -1)
+  [ -n "$lib" ] || return 0   # header-only packages have nothing to check
+  if ! "$ANDROID_LLVM_BIN/llvm-objdump" -f "$lib" 2>/dev/null | grep -q aarch64; then
+    echo "[deps] ERROR: $1 did not build for aarch64" >&2
+    return 1
   fi
+}
+
+main() {
+  [ $# -gt 0 ] || {
+    echo "usage: $0 <dep> [dep...]" >&2
+    echo "       $0 all [--force]   build everything in order, skipping what exists" >&2
+    exit 1
+  }
+
+  local targets=("$@") force=0
+  if [ "${1:-}" = all ]; then
+    targets=("${ALL_DEPS[@]}")
+    [ "${2:-}" = --force ] && force=1
+  fi
+
+  local total=${#targets[@]} n=0 built=0 skipped=0
   for t in "${targets[@]}"; do
-    echo "=== building: $t ==="
+    n=$((n + 1))
+    if [ "$force" -eq 0 ] && [ "${1:-}" = all ] && dep_is_built "$t"; then
+      echo "[$n/$total] $t: already built, skipping"
+      skipped=$((skipped + 1))
+      continue
+    fi
+    echo "=== [$n/$total] building: $t ==="
     "build_$t"
+    dep_check_arch "$t" || exit 1
+    built=$((built + 1))
   done
+
+  [ "${1:-}" = all ] && echo "[deps] done: $built built, $skipped already present"
+  return 0
 }
 
 main "$@"
