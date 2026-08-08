@@ -94,8 +94,20 @@ git config credential.helper '!f() { echo username=; echo password=; }; f'
 ## 2. Cross-compile the dependencies (~56 libraries)
 
 ```bash
+build_files/android/deps/build.sh all          # everything, in order
+build_files/android/deps/build.sh all --force  # rebuild even what exists
 build_files/android/deps/build.sh <name>       # one dep
 ```
+
+`all` skips a dependency whose install directory already has content, so an
+interrupted run can simply be repeated. Each library is checked for aarch64
+after it builds, which catches one silently building for the host.
+
+**CMake 3.26 or newer is required.** MaterialX refuses to configure with
+anything older, and 3.x and 4.x disagree about whether `Python3_LIBRARY` reaches
+the link line, which surfaces as undefined CPython symbols when USD links. The
+recipes name that library explicitly, so either version now works. Ubuntu 22.04
+ships 3.22, too old: use the Kitware packages or the upstream binary tarball.
 
 Order matters (leaf → up). A full run, roughly:
 
