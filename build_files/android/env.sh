@@ -8,6 +8,11 @@
 # Overridable by exporting before sourcing. Defaults match the toolchain
 # installed via Homebrew `android-commandlinetools` + `sdkmanager`.
 
+# Where the checkout is, resolved from this file rather than the caller's
+# directory, since env.sh is sourced from several places.
+ANDROID_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+export ANDROID_REPO_ROOT
+
 # --- SDK / NDK locations -----------------------------------------------------
 # Host differences: the NDK ships per-host prebuilt binaries, and the SDK lands
 # wherever each platform's package manager puts it.
@@ -74,6 +79,18 @@ if [ -z "${ANDROID_HOST_CC:-}" ]; then
 fi
 export ANDROID_HOST_CC="${ANDROID_HOST_CC:-cc}"
 export ANDROID_HOST_CXX="${ANDROID_HOST_CXX:-c++}"
+
+# The host code generators link against the precompiled libraries in
+# lib/linux_x64 and are then run during the target build. The rpath recorded in
+# them is not honoured here, so name the directories for the loader instead;
+# otherwise makesrna dies partway through with a missing libtbb.
+if [ "$(uname -s)" = Linux ] && [ -d "$ANDROID_REPO_ROOT/lib/linux_x64" ]; then
+  for _d in "$ANDROID_REPO_ROOT"/lib/linux_x64/*/lib; do
+    [ -d "$_d" ] && LD_LIBRARY_PATH="$_d${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  done
+  export LD_LIBRARY_PATH
+  unset _d
+fi
 
 for _tool in cmake ninja; do
   command -v "$_tool" >/dev/null 2>&1 || \

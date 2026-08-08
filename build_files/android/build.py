@@ -156,7 +156,9 @@ def build(config: str, repackage: bool = False, debuggable: bool = False,
         sh(f"{env}'{SCRIPT_DIR / 'build_apk.sh'}' {config}")
     elif repackage or not staged:
         print("[build] path: compile + repackage (no reconfigure)")
-        sh(f"ninja -C '{build_dir}' blender")
+        # env.sh, not just ninja: the host code generators run during this build
+        # and need it to find their libraries.
+        sh(f"source '{SCRIPT_DIR / 'env.sh'}' >/dev/null && ninja -C '{build_dir}' blender")
         sh(f"{env}BLENDER_ANDROID_CONFIG={config} BUILD='{build_dir}' "
            f"bash '{SCRIPT_DIR / 'apk' / 'package.sh'}'")
     else:

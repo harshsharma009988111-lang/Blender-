@@ -46,9 +46,14 @@ echo "=== [$CONFIG] host codegen tools ==="
 if [ ! -x "$HOST/bin/makesdna" ]; then
   # Only the code generators are wanted here, so keep the GUI out: on Linux a
   # full configure demands X11 development packages that nothing here uses.
+  # The feature set must otherwise match the target, or makesrna emits a
+  # different set of files than the target build expects. So TBB stays on
+  # and gets an rpath: Linux does not bake the library path into the
+  # executable the way macOS does, and the generator would not start.
   cmake -S . -B "$HOST" -G Ninja -C "$FEATURES" -DWITH_CROSSCOMPILED_TOOLS=OFF \
     -DCMAKE_C_COMPILER="$ANDROID_HOST_CC" -DCMAKE_CXX_COMPILER="$ANDROID_HOST_CXX" \
-    -DWITH_HEADLESS=ON -DWITH_X11_XINPUT=OFF -DWITH_AUDASPACE=OFF \n    -DWITH_TBB=OFF
+    -DWITH_HEADLESS=ON -DWITH_X11_XINPUT=OFF -DWITH_AUDASPACE=OFF \
+    -DCMAKE_BUILD_RPATH="$REPO_ROOT/lib/linux_x64/tbb/lib"
   ninja -C "$HOST" makesdna makesrna datatoc msgfmt shader_tool
 fi
 
