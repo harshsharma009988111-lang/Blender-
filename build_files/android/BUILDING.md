@@ -44,7 +44,24 @@ show what it does under the hood.
 
 ---
 
-## 0. Prerequisites (Homebrew)
+## 0. Prerequisites
+
+Blender's own requirement applies to the host compiler used for the code
+generators in step 3: **GCC 14 or newer, or Clang 17 or newer**. `env.sh` picks
+the first of `gcc-15`, `gcc-14`, `clang-18`, `clang-17` it finds and falls back
+to the system default, so nothing needs to become the system compiler. Ubuntu
+22.04 ships GCC 11, too old:
+
+```bash
+sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+sudo apt install -y gcc-14 g++-14
+```
+
+On Linux you also need the usual build tools plus `patchelf`, `meson` and
+`git-lfs`, and a host Python 3.13 for the numpy cross-build, built from source
+if the distribution has nothing newer than 3.12.
+
+### macOS (Homebrew)
 
 ```bash
 brew install openjdk cmake ninja meson pkgconf
