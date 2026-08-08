@@ -44,7 +44,11 @@ drop_stale_cache "$BUILD"
 
 echo "=== [$CONFIG] host codegen tools ==="
 if [ ! -x "$HOST/bin/makesdna" ]; then
-  cmake -S . -B "$HOST" -G Ninja -C "$FEATURES" -DWITH_CROSSCOMPILED_TOOLS=OFF
+  # Only the code generators are wanted here, so keep the GUI out: on Linux a
+  # full configure demands X11 development packages that nothing here uses.
+  cmake -S . -B "$HOST" -G Ninja -C "$FEATURES" -DWITH_CROSSCOMPILED_TOOLS=OFF \
+    -DCMAKE_C_COMPILER="$ANDROID_HOST_CC" -DCMAKE_CXX_COMPILER="$ANDROID_HOST_CXX" \
+    -DWITH_HEADLESS=ON -DWITH_X11_XINPUT=OFF -DWITH_AUDASPACE=OFF
   ninja -C "$HOST" makesdna makesrna datatoc msgfmt shader_tool
 fi
 

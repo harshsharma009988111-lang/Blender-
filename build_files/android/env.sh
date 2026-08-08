@@ -22,7 +22,7 @@ export ANDROID_NDK_VERSION="${ANDROID_NDK_VERSION:-28.2.13676358}"
 export ANDROID_NDK_ROOT="${ANDROID_NDK_ROOT:-$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION}"
 export ANDROID_NDK_HOME="$ANDROID_NDK_ROOT"
 
-# JDK (keg-only Homebrew openjdk) - needed for sdkmanager/adb wrappers.
+# JDK (keg-only Homebrew openjdk) — needed for sdkmanager/adb wrappers.
 case "$(uname -s)" in
   Darwin) JAVA_HOME_DEFAULT="/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home" ;;
   Linux)  JAVA_HOME_DEFAULT="/usr/lib/jvm/java-17-openjdk-amd64" ;;
@@ -56,6 +56,25 @@ case "$(uname -s)" in
 esac
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_LLVM_BIN:$PATH"
 
+# Blender wants GCC 14+ or Clang 17+. Distributions often default to something
+# older, and the failure only appears once the host tools configure, so pick a
+# suitable compiler here rather than changing the system default.
+if [ -z "${ANDROID_HOST_CC:-}" ]; then
+  for _cc in gcc-15 gcc-14 clang-18 clang-17; do
+    if command -v "$_cc" >/dev/null 2>&1; then
+      ANDROID_HOST_CC="$_cc"
+      case "$_cc" in
+        gcc-*)   ANDROID_HOST_CXX="g++-${_cc#gcc-}" ;;
+        clang-*) ANDROID_HOST_CXX="clang++-${_cc#clang-}" ;;
+      esac
+      break
+    fi
+  done
+  unset _cc
+fi
+export ANDROID_HOST_CC="${ANDROID_HOST_CC:-cc}"
+export ANDROID_HOST_CXX="${ANDROID_HOST_CXX:-c++}"
+
 for _tool in cmake ninja; do
   command -v "$_tool" >/dev/null 2>&1 || \
     echo "[blender-android] WARNING: $_tool not found in PATH"
@@ -65,4 +84,4 @@ unset _tool
 echo "[blender-android] NDK   : $ANDROID_NDK_ROOT"
 echo "[blender-android] ABI   : $ANDROID_ABI   API(min): $ANDROID_API   target: $ANDROID_TARGET_API"
 echo "[blender-android] toolch: $ANDROID_TOOLCHAIN_FILE"
-[ -f "$ANDROID_TOOLCHAIN_FILE" ] || echo "[blender-android] WARNING: toolchain file not found - check ANDROID_NDK_ROOT"
+[ -f "$ANDROID_TOOLCHAIN_FILE" ] || echo "[blender-android] WARNING: toolchain file not found — check ANDROID_NDK_ROOT"
