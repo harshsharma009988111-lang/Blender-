@@ -1,4 +1,4 @@
-name: Build Blender Android Diagnostic APK
+name: Build Blender Android APK
 
 on:
   workflow_dispatch:
@@ -9,15 +9,13 @@ jobs:
     timeout-minutes: 360
 
     steps:
-
       - name: Checkout Android Alpha source
         uses: actions/checkout@v4
         with:
-          repository: simfeo/blender
           ref: android-alpha-1
           fetch-depth: 1
-          submodules: false
           lfs: false
+          submodules: false
 
       - name: Install build tools
         run: |
@@ -37,204 +35,103 @@ jobs:
             unzip \
             curl \
             wget \
-            openjdk-17-jdk
+            openjdk-17-jdk \
+            libx11-dev \
+            libxi-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev \
+            libwayland-dev
 
       - name: Install Android SDK and NDK
         uses: android-actions/setup-android@v3
 
       - name: Install Android platform and NDK
         run: |
-          sdkmanager --install "platform-tools"
-          sdkmanager --install "platforms;android-35"
-          sdkmanager --install "build-tools;35.0.1"
-          sdkmanager --install "ndk;28.2.13676358"
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.1" \
+            "ndk;28.2.13676358"
 
       - name: Set Android environment
         run: |
           echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
 
-      - name: Download startup.blend from Git LFS
+      - name: Show source information
         run: |
-          git lfs install
+          echo "Branch:"
+          git branch --show-current
 
-          python3 - <<'PY'
-          import json
-          import urllib.request
-          from pathlib import Path
+          echo "Commit:"
+          git log -1 --oneline
 
-          oid = "1335899143c7e77cb0f6e3680fd99078c0af481a1238e4ed7d4eb1ddd7dd353"
-          size = 121384
+          echo "Git LFS files:"
+          git lfs ls-files | head -20 || true
 
-          request_data = {
-              "operation": "download",
-              "transfers": ["basic"],
-              "objects": [
-                  {
-                      "oid": oid,
-                      "size": size
-                  }
-              ]
-          }
-
-          url = "https://github.com/blender/blender.git/info/lfs/objects/batch"
-
-          request = urllib.request.Request(
-              url,
-              data=json.dumps(request_data).encode(),
-              headers={
-                  "Accept": "application/vnd.git-lfs+json",
-                  "Content-Type": "application/vnd.git-lfs+json"
-              },
-              method="POST"
-          )
-
-          with urllib.request.urlopen(request) as response:
-              result = json.load(response)
-
-          obj = result["objects"][0]
-
-          if "error" in obj:
-              print(obj["error"])
-              raise SystemExit(1)
-
-          download = obj.get("actions", {}).get("download")
-
-          if not download:
-              print("ERROR: Git LFS did not provide a download URL.")
-              print(result)
-              raise SystemExit(1)
-
-          download_url = download["href"]
-
-          print("Git LFS download URL obtained.")
-
-          with urllib.request.urlopen(download_url) as response:
-              data = response.read()
-
-          if len(data) != size:
-              print("ERROR: Downloaded file has unexpected size.")
-              print("Expected:", size)
-              print("Received:", len(data))
-              raise SystemExit(1)
-
-          path = Path("release/datafiles/startup.blend")
-          path.parent.mkdir(parents=True, exist_ok=True)
-          path.write_bytes(data)
-
-          print("startup.blend downloaded successfully.")
-          print("Size:", len(data))
-          PY
-
-      - name: Verify startup.blend
+      - name: Prepare startup.blend
+        shell: bash
         run: |
-          ls -lh release/datafiles/startup.blend
+          set -e
 
-          SIZE=$(stat -c%s release/datafiles/startup.blend)
+          FILE="release/datafiles/startup.blend"
 
-          if [ "$SIZE" -lt 100000 ]; then
-            echo "ERROR: startup.blend is too small."
+          echo "Checking $FILE"
+
+          if [ -f "$FILE" ]; then
+            SIZE=$(wc -c < "$FILE")
+            echo "startup.blend exists."
+            echo "Size: $SIZE bytes"
+
+            if [ "$SIZE" -gt 10000 ]; then
+              echo "startup.blend appears to be a real Blender file."
+              exit 0
+            fi
+
+            echo "startup.blend is only an LFS pointer."
+          else
+            echo "startup.blend does not exist."
+          fi
+
+          echo ""
+          echo "The Android Alpha source is missing its startup.blend LFS object."
+          echo "Trying to obtain the file from the Android Alpha release APK."
+
+          mkdir -p /tmp/blender_apk
+          cd /tmp/blender_apk
+
+          curl -L \
+            --fail \
+            --retry 3 \
+            -o blender-lite.apk \
+            "https://github.com/simfeo/blender/releases/download/android-alpha-1/blender-lite.apk"
+
+          echo "APK downloaded."
+
+          unzip -l blender-lite.apk | grep -i "startup.blend" || true
+
+          mkdir -p extracted
+          unzip -q blender-lite.apk -d extracted
+
+          FOUND=$(find extracted -type f -iname "startup.blend" | head -1)
+
+          if [ -z "$FOUND" ]; then
+            echo ""
+            echo "ERROR: startup.blend was not found inside the release APK."
+            echo ""
+            echo "Files containing 'blend' found in APK:"
+            find extracted -type f | grep -i "blend" | head -50 || true
             exit 1
           fi
 
-          echo "startup.blend is valid."
+          echo "Found startup.blend:"
+          echo "$FOUND"
 
-      - name: Apply diagnostic logging
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
+          cp "$FOUND" "$GITHUB_WORKSPACE/release/datafiles/startup.blend"
 
-          path = Path("source/blender/gpu/intern/gpu_storage_buffer.cc")
-          text = path.read_text()
+          SIZE=$(wc -c < "$GITHUB_WORKSPACE/release/datafiles/startup.blend")
 
-          if "#include <android/log.h>" not in text:
-              text = text.replace(
-                  "#include <cstring>",
-                  """#include <cstring>
-
-          #ifdef __ANDROID__
-          #  include <android/log.h>
-          #  define LOG_DIAG(...) __android_log_print(ANDROID_LOG_ERROR, "BLENDER_DIAGNOSTIC", __VA_ARGS__)
-          #endif""",
-                  1
-              )
-
-          old = """gpu::StorageBuf *GPU_storagebuf_create_ex(size_t size,
-                                            const void *data,
-                                            GPUUsageType usage,
-                                            const char *name)
-          {
-            StorageBuf *ssbo = GPUBackend::get()->storagebuf_alloc(size, usage, name);
-          """
-
-          new = """gpu::StorageBuf *GPU_storagebuf_create_ex(size_t size,
-                                            const void *data,
-                                            GPUUsageType usage,
-                                            const char *name)
-          {
-            LOG_DIAG(
-                "[BLENDER DIAGNOSTIC] GPU_storagebuf_create_ex(size=%zu, name='%s') called",
-                size,
-                name ? name : "unnamed");
-
-            if (!GPU_storage_buffer_support()) {
-              LOG_DIAG("[BLENDER DIAGNOSTIC] Storage buffer support = FALSE");
-              return nullptr;
-            }
-
-            LOG_DIAG("[BLENDER DIAGNOSTIC] Storage buffer support = TRUE");
-
-            StorageBuf *ssbo =
-                GPUBackend::get()->storagebuf_alloc(size, usage, name);
-
-            if (ssbo == nullptr) {
-              LOG_DIAG("[BLENDER DIAGNOSTIC] storagebuf_alloc() returned NULL");
-              return nullptr;
-            }
-
-            LOG_DIAG(
-                "[BLENDER DIAGNOSTIC] storagebuf_alloc() succeeded: %p",
-                ssbo);
-          """
-
-          if new in text:
-              print("Diagnostic patch already present.")
-          elif old in text:
-              path.write_text(text.replace(old, new, 1))
-              print("Diagnostic patch applied.")
-          else:
-              print("ERROR: Could not find GPU_storagebuf_create_ex().")
-              raise SystemExit(1)
-          PY
-
-      - name: Configure Android environment
-        run: |
-          source build_files/android/env.sh
-
-          echo "ANDROID_ABI=$ANDROID_ABI" >> "$GITHUB_ENV"
-          echo "ANDROID_API=$ANDROID_API" >> "$GITHUB_ENV"
-          echo "ANDROID_TOOLCHAIN_FILE=$ANDROID_TOOLCHAIN_FILE" >> "$GITHUB_ENV"
-
-      - name: Build Android dependencies
-        run: |
-          chmod +x build_files/android/deps/build.sh
-          build_files/android/deps/build.sh all
-
-      - name: Build Blender Android APK
-        run: |
-          chmod +x build_files/android/build_apk.sh
-          build_files/android/build_apk.sh lite
-
-      - name: Find APK
-        run: |
-          find .. -type f -name "*.apk" -print
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: blender-android-diagnostic
-          path: |
-            ../blender_build_android/**/*.apk
-          if-no-files-found: error
-          retention-days: 7
+          echo "Copied startup.blend
