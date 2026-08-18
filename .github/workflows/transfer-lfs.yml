@@ -1,0 +1,85 @@
+name: Transfer Blender LFS Objects
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  transfer-lfs:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Install Git LFS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git git-lfs
+
+          git lfs install
+
+      - name: Clone Android Alpha source
+        run: |
+          git clone \
+            --bare \
+            --branch android-alpha-1 \
+            https://github.com/simfeo/blender.git \
+            blender-lfs
+
+      - name: Fetch all LFS objects from original repository
+        working-directory: blender-lfs
+        run: |
+          git lfs fetch --all
+
+      - name: Check downloaded LFS objects
+        working-directory: blender-lfs
+        run: |
+          echo "Checking LFS objects..."
+
+          git lfs ls-files | head -20
+
+          echo "LFS object count:"
+          find .git/lfs/objects -type f | wc -l
+
+      - name: Push LFS objects to my repository
+        working-directory: blender-lfs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git lfs push \
+            --all \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/harshsharma009988111-lang/Blender-.git"
+
+      - name: Verify transfer
+        run: |
+          echo "LFS transfer completed."
+
+          git lfs install
+
+          git clone \
+            --branch android-alpha-1 \
+            --depth 1 \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/harshsharma009988111-lang/Blender-.git" \
+            verify-repo
+
+          cd verify-repo
+
+          git lfs pull
+
+          echo "Checking startup.blend..."
+
+          if [ ! -f "release/datafiles/startup.blend" ]; then
+            echo "ERROR: startup.blend is missing."
+            exit 1
+          fi
+
+          SIZE=$(stat -c%s "release/datafiles/startup.blend")
+
+          echo "startup.blend size: $SIZE bytes"
+
+          if [ "$SIZE" -lt 1000000 ]; then
+            echo "ERROR: startup.blend is still an LFS pointer/incomplete file."
+            exit 1
+          fi
+
+          echo "SUCCESS: startup.blend was downloaded correctly."
