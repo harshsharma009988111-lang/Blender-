@@ -1,4 +1,4 @@
-name: Build Blender Android APK
+name: Build Blender Android Diagnostic APK
 
 on:
   workflow_dispatch:
@@ -9,10 +9,7 @@ jobs:
     timeout-minutes: 360
 
     steps:
-
       - name: Checkout Android Alpha source
-        env:
-          GIT_LFS_SKIP_SMUDGE: 1
         uses: actions/checkout@v4
         with:
           repository: simfeo/blender
@@ -70,37 +67,19 @@ jobs:
           git log -1 --oneline
 
       - name: Apply diagnostic logging
-        shell: bash
         run: |
-          python3 <<'PY'
-          from pathlib import Path
-
-          path = Path("source/blender/gpu/intern/gpu_storage_buffer.cc")
-          text = path.read_text()
-
-          if '#include <android/log.h>' not in text:
-              text = text.replace(
-                  '#include <cstring>',
-                  '#include <cstring>\n\n#ifdef __ANDROID__\n#  include <android/log.h>\n#  define LOG_DIAG(...) __android_log_print(ANDROID_LOG_ERROR, "BLENDER_DIAGNOSTIC", __VA_ARGS__)\n#else\n#  include <cstdio>\n#  define LOG_DIAG(...) std::printf(__VA_ARGS__)\n#endif',
-                  1
-              )
-
-          old = """gpu::StorageBuf *GPU_storagebuf_create_ex(size_t size,
+          python3 -c 'from pathlib import Path; p=Path("source/blender/gpu/intern/gpu_storage_buffer.cc"); t=p.read_text(); t=t.replace("#include <cstring>", "#include <cstring>\n\n#ifdef __ANDROID__\n#  include <android/log.h>\n#  define LOG_DIAG(...) __android_log_print(ANDROID_LOG_ERROR, \"BLENDER_DIAGNOSTIC\", __VA_ARGS__)\n#else\n#  include <cstdio>\n#  define LOG_DIAG(...) std::printf(__VA_ARGS__)\n#endif", 1) if "#include <android/log.h>" not in t else t; old="""gpu::StorageBuf *GPU_storagebuf_create_ex(size_t size,
                                           const void *data,
                                           GPUUsageType usage,
                                           const char *name)
 {
   StorageBuf *ssbo = GPUBackend::get()->storagebuf_alloc(size, usage, name);
-"""
-
-          new = """gpu::StorageBuf *GPU_storagebuf_create_ex(size_t size,
+"""; new="""gpu::StorageBuf *GPU_storagebuf_create_ex(size_t size,
                                           const void *data,
                                           GPUUsageType usage,
                                           const char *name)
 {
-  LOG_DIAG("[BLENDER DIAGNOSTIC] GPU_storagebuf_create_ex(size=%zu, name='%s') called",
-           size,
-           name ? name : "unnamed");
+  LOG_DIAG("[BLENDER DIAGNOSTIC] GPU_storagebuf_create_ex(size=%zu, name='%s') called", size, name ? name : "unnamed");
 
   if (!GPU_storage_buffer_support()) {
     LOG_DIAG("[BLENDER DIAGNOSTIC] Storage buffer support = FALSE");
@@ -117,18 +96,12 @@ jobs:
   }
 
   LOG_DIAG("[BLENDER DIAGNOSTIC] storagebuf_alloc() succeeded: %p", ssbo);
-"""
+"""; assert old in t, "GPU_storagebuf_create_ex() layout not found"; p.write_text(t.replace(old,new,1))'
 
-          if new not in text:
-              if old not in text:
-                  print("ERROR: GPU_storagebuf_create_ex() layout did not match.")
-                  raise SystemExit(1)
-
-              text = text.replace(old, new, 1)
-
-          path.write_text(text)
-          print("Diagnostic logging patch applied.")
-          PY
+      - name: Verify diagnostic patch
+        run: |
+          grep -n "BLENDER_DIAGNOSTIC" \
+            source/blender/gpu/intern/gpu_storage_buffer.cc
 
       - name: Configure Android environment
         run: |
@@ -138,8 +111,8 @@ jobs:
           echo "ANDROID_API=$ANDROID_API" >> "$GITHUB_ENV"
           echo "ANDROID_TOOLCHAIN_FILE=$ANDROID_TOOLCHAIN_FILE" >> "$GITHUB_ENV"
 
-          echo "ABI: $ANDROID_ABI"
-          echo "API: $ANDROID_API"
+          echo "Android ABI: $ANDROID_ABI"
+          echo "Android API: $ANDROID_API"
           echo "NDK: $ANDROID_NDK_HOME"
 
       - name: Build Android dependencies
@@ -147,17 +120,17 @@ jobs:
           chmod +x build_files/android/deps/build.sh
           build_files/android/deps/build.sh all
 
-      - name: Build Blender Android APK
+      - name: Build diagnostic Blender APK
         run: |
           chmod +x build_files/android/build_apk.sh
           build_files/android/build_apk.sh lite
 
-      - name: Find APK
+      - name: Find generated APK
         run: |
-          echo "Searching for generated APK..."
+          echo "Searching for APK files..."
           find .. -type f -name "*.apk" -print
 
-      - name: Upload APK
+      - name: Upload diagnostic APK
         uses: actions/upload-artifact@v4
         with:
           name: blender-android-diagnostic
