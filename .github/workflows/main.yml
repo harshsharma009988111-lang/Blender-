@@ -61,96 +61,73 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
 
-      - name: Restore startup.blend from Android Alpha APK
+      - name: Show source information
+        run: |
+          echo "Branch:"
+          git branch --show-current
+
+          echo "Commit:"
+          git log -1 --oneline
+
+      - name: Restore official startup.blend
         shell: bash
         run: |
           set -e
 
-          APK="/tmp/blender-lite.apk"
-          APK_DIR="/tmp/blender_apk"
-          RUNTIME="/tmp/runtime"
-
-          echo "Downloading Android Alpha lite APK..."
-
-          curl -fL \
-            "https://github.com/simfeo/blender/releases/download/android-alpha-1/blender-lite.apk" \
-            -o "$APK"
-
-          echo "APK downloaded."
-
-          rm -rf "$APK_DIR" "$RUNTIME"
-
-          mkdir -p "$APK_DIR"
-          mkdir -p "$RUNTIME"
-
-          echo "Extracting blender_runtime.zip..."
-
-          unzip -q \
-            "$APK" \
-            "assets/blender_runtime.zip" \
-            -d "$APK_DIR"
-
-          if [ ! -f "$APK_DIR/assets/blender_runtime.zip" ]; then
-            echo "ERROR: blender_runtime.zip was not found."
-            exit 1
-          fi
-
-          echo "Extracting runtime..."
-
-          unzip -q \
-            "$APK_DIR/assets/blender_runtime.zip" \
-            -d "$RUNTIME"
-
-          echo "Searching for startup.blend..."
-
-          STARTUP=$(find "$RUNTIME" -type f -name "startup.blend" -print -quit)
-
-          if [ -z "$STARTUP" ]; then
-            echo "ERROR: startup.blend was not found."
-            exit 1
-          fi
-
-          echo "Found:"
-          echo "$STARTUP"
-
           mkdir -p release/datafiles
 
-          cp "$STARTUP" release/datafiles/startup.blend
+          echo "Downloading official Blender startup.blend..."
 
-          echo "startup.blend restored."
+          curl -fL \
+            "https://media.githubusercontent.com/media/blender/blender/main/release/datafiles/startup.blend" \
+            -o release/datafiles/startup.blend
+
+          echo "startup.blend downloaded."
 
       - name: Verify startup.blend
         shell: bash
         run: |
           set -e
 
-          if [ ! -f "release/datafiles/startup.blend" ]; then
-            echo "ERROR: startup.blend does not exist."
+          FILE="release/datafiles/startup.blend"
+
+          if [ ! -f "$FILE" ]; then
+            echo "ERROR: startup.blend was not downloaded."
             exit 1
           fi
 
-          SIZE=$(stat -c%s release/datafiles/startup.blend)
-          SHA=$(sha256sum release/datafiles/startup.blend | cut -d' ' -f1)
+          SIZE=$(stat -c%s "$FILE")
+          SHA=$(sha256sum "$FILE" | cut -d' ' -f1)
 
           echo "startup.blend size: $SIZE"
           echo "startup.blend SHA256: $SHA"
 
-          if [ "$SIZE" -ne 121384 ]; then
-            echo "ERROR: startup.blend has the wrong size."
+          EXPECTED_SIZE="121384"
+          EXPECTED_SHA="1335899143c7e77bcb0f6e3680fd99078c0af481a1238e4ed7d4eb1ddd7dd353"
+
+          if [ "$SIZE" != "$EXPECTED_SIZE" ]; then
+            echo "ERROR: Wrong startup.blend size."
             exit 1
           fi
 
-          if [ "$SHA" != "1335899143c7e77cb0f6e3680fd99078c0af481a1238e4ed7d4eb1ddd7dd353" ]; then
-            echo "ERROR: startup.blend has the wrong SHA256."
+          if [ "$SHA" != "$EXPECTED_SHA" ]; then
+            echo "ERROR: Wrong startup.blend SHA256."
             exit 1
           fi
 
-          echo "startup.blend verification PASSED."
+          echo "SUCCESS: startup.blend verified."
 
       - name: Apply GPU storage buffer fix
         shell: bash
         run: |
           set -e
+
+          FILE="source/blender/gpu/intern/gpu_storage_buffer.cc"
+
+          if [ ! -f "$FILE" ]; then
+            echo "ERROR: GPU storage buffer source file not found."
+            exit 1
+          fi
 
           python3 <<'PY'
           from pathlib import Path
@@ -173,25 +150,76 @@ jobs:
           }"""
 
           if new in text:
-              print("GPU storage buffer fix already present.")
+              print("GPU storage buffer fix is already present.")
+
           elif old in text:
-              path.write_text(text.replace(old, new, 1))
-              print("GPU storage buffer fix applied.")
+              text = text.replace(old, new, 1)
+              path.write_text(text)
+              print("GPU storage buffer fix applied successfully.")
+
           else:
-              print("ERROR: GPU_storagebuf_update function was not found.")
-              exit(1)
+              print("ERROR: Expected GPU_storagebuf_update function was not found.")
+              raise SystemExit(1)
+          PY
+
+      - name: Verify GPU storage buffer fix
+        shell: bash
+        run: |
+          set -e
+
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path("source/blender/gpu/intern/gpu_storage_buffer.cc")
+          text = path.read_text()
+
+          marker = "void GPU_storagebuf_update"
+          start = text.find(marker)
+
+          if start == -1:
+              print("ERROR: GPU_storagebuf_update was not found.")
+              raise SystemExit(1)
+
+          end = text.find("\n}", start)
+
+          if end == -1:
+              print("ERROR: Could not read GPU_storagebuf_update.")
+              raise SystemExit(1)
+
+          function = text[start:end + 2]
+
+          print("GPU_storagebuf_update:")
+          print(function)
+
+          if "if (ssbo == nullptr)" not in function:
+              print("ERROR: Null-pointer guard was not applied.")
+              raise SystemExit(1)
+
+          print("SUCCESS: GPU storage buffer fix verified.")
           PY
 
       - name: Configure Android environment
+        shell: bash
         run: |
+          set -e
+
           source build_files/android/env.sh
 
           echo "ANDROID_ABI=$ANDROID_ABI" >> "$GITHUB_ENV"
           echo "ANDROID_API=$ANDROID_API" >> "$GITHUB_ENV"
           echo "ANDROID_TOOLCHAIN_FILE=$ANDROID_TOOLCHAIN_FILE" >> "$GITHUB_ENV"
 
+          echo "Android ABI: $ANDROID_ABI"
+          echo "Android API: $ANDROID_API"
+          echo "Android NDK: $ANDROID_NDK_HOME"
+
       - name: Build Android dependencies
+        shell: bash
         run: |
+          set -e
+
+          echo "Building Blender Android dependencies..."
+
           mkdir -p ../blender_build_android/lib/android_arm64
 
           chmod +x build_files/android/deps/build.sh
@@ -199,14 +227,19 @@ jobs:
           build_files/android/deps/build.sh all
 
       - name: Build Blender Android APK
+        shell: bash
         run: |
+          set -e
+
           chmod +x build_files/android/build_apk.sh
 
           build_files/android/build_apk.sh lite
 
       - name: Find APK
+        shell: bash
         run: |
-          echo "Generated APK files:"
+          echo "Searching for generated APK..."
+
           find .. -type f -name "*.apk" -print
 
       - name: Upload APK
