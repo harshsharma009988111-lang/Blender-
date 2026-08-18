@@ -61,77 +61,182 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
 
-      - name: Show source information
-        run: |
-          echo "Branch:"
-          git branch --show-current
-
-          echo "Commit:"
-          git log -1 --oneline
-
-          echo "Git LFS files:"
-          git lfs ls-files | head -20 || true
-
-      - name: Prepare startup.blend
+      - name: Download exact startup.blend
         shell: bash
         run: |
           set -e
 
           FILE="release/datafiles/startup.blend"
 
-          echo "Checking $FILE"
+          echo "Downloading exact Android Alpha startup.blend..."
 
-          if [ -f "$FILE" ]; then
-            SIZE=$(wc -c < "$FILE")
-            echo "startup.blend exists."
-            echo "Size: $SIZE bytes"
-
-            if [ "$SIZE" -gt 10000 ]; then
-              echo "startup.blend appears to be a real Blender file."
-              exit 0
-            fi
-
-            echo "startup.blend is only an LFS pointer."
-          else
-            echo "startup.blend does not exist."
-          fi
-
-          echo ""
-          echo "The Android Alpha source is missing its startup.blend LFS object."
-          echo "Trying to obtain the file from the Android Alpha release APK."
-
-          mkdir -p /tmp/blender_apk
-          cd /tmp/blender_apk
+          mkdir -p release/datafiles
 
           curl -L \
             --fail \
-            --retry 3 \
-            -o blender-lite.apk \
-            "https://github.com/simfeo/blender/releases/download/android-alpha-1/blender-lite.apk"
+            --retry 5 \
+            -o "$FILE" \
+            "https://media.githubusercontent.com/media/simfeo/blender/android-alpha-1/release/datafiles/startup.blend"
 
-          echo "APK downloaded."
+          echo "Downloaded startup.blend."
 
-          unzip -l blender-lite.apk | grep -i "startup.blend" || true
+          SIZE=$(wc -c < "$FILE")
 
-          mkdir -p extracted
-          unzip -q blender-lite.apk -d extracted
+          echo "Size: $SIZE bytes"
 
-          FOUND=$(find extracted -type f -iname "startup.blend" | head -1)
-
-          if [ -z "$FOUND" ]; then
-            echo ""
-            echo "ERROR: startup.blend was not found inside the release APK."
-            echo ""
-            echo "Files containing 'blend' found in APK:"
-            find extracted -type f | grep -i "blend" | head -50 || true
+          if [ "$SIZE" -lt 100000 ]; then
+            echo "ERROR: Downloaded file is too small."
+            echo "The LFS object was not downloaded correctly."
             exit 1
           fi
 
-          echo "Found startup.blend:"
-          echo "$FOUND"
+          echo "startup.blend download successful."
 
-          cp "$FOUND" "$GITHUB_WORKSPACE/release/datafiles/startup.blend"
+      - name: Verify startup.blend
+        run: |
+          FILE="release/datafiles/startup.blend"
 
-          SIZE=$(wc -c < "$GITHUB_WORKSPACE/release/datafiles/startup.blend")
+          if [ ! -f "$FILE" ]; then
+            echo "ERROR: startup.blend is missing."
+            exit 1
+          fi
 
-          echo "Copied startup.blend
+          SIZE=$(wc -c < "$FILE")
+
+          echo "startup.blend size: $SIZE bytes"
+
+          if [ "$SIZE" -ne 121384 ]; then
+            echo "WARNING: Expected Android Alpha size is 121384 bytes."
+            echo "Continuing because the file is larger than the LFS pointer."
+          fi
+
+          if grep -q "git-lfs.github.com/spec/v1" "$FILE" 2>/dev/null; then
+            echo "ERROR: startup.blend is still an LFS pointer."
+            exit 1
+          fi
+
+          echo "startup.blend verification passed."
+
+      - name: Apply null pointer diagnostic fix
+        shell: bash
+        run: |
+          set -e
+
+          FILE="source/blender/gpu/intern/gpu_storage_buffer.cc"
+
+          if [ ! -f "$FILE" ]; then
+            echo "ERROR: GPU storage buffer source not found."
+            exit 1
+          fi
+
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path("source/blender/gpu/intern/gpu_storage_buffer.cc")
+          text = path.read_text()
+
+          old = """void GPU_storagebuf_update(gpu::StorageBuf *ssbo, const void *data)
+          {
+            ssbo->update(data);
+          }"""
+
+          new = """void GPU_storagebuf_update(gpu::StorageBuf *ssbo, const void *data)
+          {
+            if (ssbo == nullptr) {
+              return;
+            }
+
+            ssbo->update(data);
+          }"""
+
+          if new in text:
+              print("Null-pointer guard already exists.")
+
+          elif old in text:
+              text = text.replace(old, new, 1)
+              path.write_text(text)
+              print("Null-pointer guard applied.")
+
+          else:
+              print("ERROR: Expected GPU_storagebuf_update function was not found.")
+              raise SystemExit(1)
+          PY
+
+      - name: Verify null pointer fix
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path("source/blender/gpu/intern/gpu_storage_buffer.cc")
+          text = path.read_text()
+
+          marker = "void GPU_storagebuf_update"
+
+          start = text.find(marker)
+
+          if start == -1:
+              print("ERROR: GPU_storagebuf_update not found.")
+              raise SystemExit(1)
+
+          end = text.find("\n}", start)
+
+          if end == -1:
+              print("ERROR: Could not read function.")
+              raise SystemExit(1)
+
+          function = text[start:end + 2]
+
+          print(function)
+
+          if "if (ssbo == nullptr)" not in function:
+              print("ERROR: Null-pointer guard missing.")
+              raise SystemExit(1)
+
+          print("Null-pointer fix verified.")
+          PY
+
+      - name: Configure Android environment
+        run: |
+          source build_files/android/env.sh
+
+          echo "ANDROID_ABI=$ANDROID_ABI" >> "$GITHUB_ENV"
+          echo "ANDROID_API=$ANDROID_API" >> "$GITHUB_ENV"
+          echo "ANDROID_TOOLCHAIN_FILE=$ANDROID_TOOLCHAIN_FILE" >> "$GITHUB_ENV"
+
+          echo "ANDROID_ABI=$ANDROID_ABI"
+          echo "ANDROID_API=$ANDROID_API"
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+
+      - name: Build Android dependencies
+        run: |
+          echo "Building Android dependencies..."
+
+          mkdir -p ../blender_build_android/lib/android_arm64
+
+          chmod +x build_files/android/deps/build.sh
+
+          build_files/android/deps/build.sh all
+
+      - name: Build Blender Android APK
+        run: |
+          chmod +x build_files/android/build_apk.sh
+
+          build_files/android/build_apk.sh lite
+
+      - name: Find APK
+        run: |
+          echo "Searching for generated APK..."
+
+          find .. \
+            -type f \
+            -name "*.apk" \
+            -print
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: blender-android-lite-modified
+          path: |
+            ../blender_build_android/**/*.apk
+          if-no-files-found: error
+          retention-days: 7
