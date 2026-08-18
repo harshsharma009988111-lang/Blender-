@@ -14,8 +14,8 @@ jobs:
         with:
           ref: android-alpha-1
           fetch-depth: 1
-          lfs: false
           submodules: false
+          lfs: false
 
       - name: Install build tools
         run: |
@@ -61,73 +61,62 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
 
-      - name: Download exact startup.blend
+      - name: Restore exact startup.blend
         shell: bash
         run: |
           set -e
 
           FILE="release/datafiles/startup.blend"
+          EXPECTED_SHA="1335899143c7e77cb0f6e3680fd99078c0af481a1238e4ed7d4eb1ddd7dd353"
+          EXPECTED_SIZE="121384"
 
-          echo "Downloading exact Android Alpha startup.blend..."
+          echo "Downloading exact Blender startup.blend..."
 
           mkdir -p release/datafiles
 
-          curl -L \
-            --fail \
-            --retry 5 \
-            -o "$FILE" \
-            "https://media.githubusercontent.com/media/simfeo/blender/android-alpha-1/release/datafiles/startup.blend"
+          curl -fL \
+            "https://media.githubusercontent.com/media/blender/blender/main/release/datafiles/startup.blend" \
+            -o "${FILE}.real"
 
-          echo "Downloaded startup.blend."
+          ACTUAL_SIZE=$(stat -c%s "${FILE}.real")
+          ACTUAL_SHA=$(sha256sum "${FILE}.real" | awk '{print $1}')
 
-          SIZE=$(wc -c < "$FILE")
+          echo "Downloaded size: ${ACTUAL_SIZE}"
+          echo "Downloaded SHA256: ${ACTUAL_SHA}"
 
-          echo "Size: $SIZE bytes"
-
-          if [ "$SIZE" -lt 100000 ]; then
-            echo "ERROR: Downloaded file is too small."
-            echo "The LFS object was not downloaded correctly."
+          if [ "$ACTUAL_SIZE" != "$EXPECTED_SIZE" ]; then
+            echo "ERROR: startup.blend has wrong size."
             exit 1
           fi
 
-          echo "startup.blend download successful."
+          if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+            echo "ERROR: startup.blend has wrong SHA256."
+            exit 1
+          fi
+
+          mv "${FILE}.real" "$FILE"
+
+          echo "Exact startup.blend restored successfully."
 
       - name: Verify startup.blend
         run: |
-          FILE="release/datafiles/startup.blend"
+          SIZE=$(stat -c%s release/datafiles/startup.blend)
+          SHA=$(sha256sum release/datafiles/startup.blend | awk '{print $1}')
 
-          if [ ! -f "$FILE" ]; then
-            echo "ERROR: startup.blend is missing."
-            exit 1
-          fi
+          echo "startup.blend size: $SIZE"
+          echo "startup.blend SHA256: $SHA"
 
-          SIZE=$(wc -c < "$FILE")
+          test "$SIZE" = "121384"
+          test "$SHA" = "1335899143c7e77cb0f6e3680fd99078c0af481a1238e4ed7d4eb1ddd7dd353"
 
-          echo "startup.blend size: $SIZE bytes"
+          echo "startup.blend verification PASSED."
 
-          if [ "$SIZE" -ne 121384 ]; then
-            echo "WARNING: Expected Android Alpha size is 121384 bytes."
-            echo "Continuing because the file is larger than the LFS pointer."
-          fi
-
-          if grep -q "git-lfs.github.com/spec/v1" "$FILE" 2>/dev/null; then
-            echo "ERROR: startup.blend is still an LFS pointer."
-            exit 1
-          fi
-
-          echo "startup.blend verification passed."
-
-      - name: Apply null pointer diagnostic fix
+      - name: Apply GPU storage buffer fix
         shell: bash
         run: |
           set -e
 
           FILE="source/blender/gpu/intern/gpu_storage_buffer.cc"
-
-          if [ ! -f "$FILE" ]; then
-            echo "ERROR: GPU storage buffer source not found."
-            exit 1
-          fi
 
           python3 <<'PY'
           from pathlib import Path
@@ -150,49 +139,13 @@ jobs:
           }"""
 
           if new in text:
-              print("Null-pointer guard already exists.")
-
+              print("GPU storage buffer fix already present.")
           elif old in text:
-              text = text.replace(old, new, 1)
-              path.write_text(text)
-              print("Null-pointer guard applied.")
-
+              path.write_text(text.replace(old, new, 1))
+              print("GPU storage buffer fix applied.")
           else:
-              print("ERROR: Expected GPU_storagebuf_update function was not found.")
+              print("ERROR: Expected function was not found.")
               raise SystemExit(1)
-          PY
-
-      - name: Verify null pointer fix
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-
-          path = Path("source/blender/gpu/intern/gpu_storage_buffer.cc")
-          text = path.read_text()
-
-          marker = "void GPU_storagebuf_update"
-
-          start = text.find(marker)
-
-          if start == -1:
-              print("ERROR: GPU_storagebuf_update not found.")
-              raise SystemExit(1)
-
-          end = text.find("\n}", start)
-
-          if end == -1:
-              print("ERROR: Could not read function.")
-              raise SystemExit(1)
-
-          function = text[start:end + 2]
-
-          print(function)
-
-          if "if (ssbo == nullptr)" not in function:
-              print("ERROR: Null-pointer guard missing.")
-              raise SystemExit(1)
-
-          print("Null-pointer fix verified.")
           PY
 
       - name: Configure Android environment
@@ -203,14 +156,12 @@ jobs:
           echo "ANDROID_API=$ANDROID_API" >> "$GITHUB_ENV"
           echo "ANDROID_TOOLCHAIN_FILE=$ANDROID_TOOLCHAIN_FILE" >> "$GITHUB_ENV"
 
-          echo "ANDROID_ABI=$ANDROID_ABI"
-          echo "ANDROID_API=$ANDROID_API"
-          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+          echo "ABI: $ANDROID_ABI"
+          echo "API: $ANDROID_API"
+          echo "NDK: $ANDROID_NDK_HOME"
 
       - name: Build Android dependencies
         run: |
-          echo "Building Android dependencies..."
-
           mkdir -p ../blender_build_android/lib/android_arm64
 
           chmod +x build_files/android/deps/build.sh
@@ -227,15 +178,12 @@ jobs:
         run: |
           echo "Searching for generated APK..."
 
-          find .. \
-            -type f \
-            -name "*.apk" \
-            -print
+          find .. -type f -name "*.apk" -print
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: blender-android-lite-modified
+          name: blender-android-modified
           path: |
             ../blender_build_android/**/*.apk
           if-no-files-found: error
