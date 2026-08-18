@@ -61,62 +61,72 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
 
-      - name: Restore exact startup.blend
+      - name: Restore startup.blend from Android Alpha APK
         shell: bash
         run: |
           set -e
 
-          FILE="release/datafiles/startup.blend"
-          EXPECTED_SHA="1335899143c7e77cb0f6e3680fd99078c0af481a1238e4ed7d4eb1ddd7dd353"
-          EXPECTED_SIZE="121384"
+          echo "Downloading official Android Alpha lite APK..."
 
-          echo "Downloading exact Blender startup.blend..."
+          curl -fL \
+            "https://github.com/simfeo/blender/releases/download/android-alpha-1/blender-lite.apk" \
+            -o /tmp/blender-lite.apk
+
+          echo "Extracting blender_runtime.zip..."
+
+          mkdir -p /tmp/blender_apk
+          unzip -q /tmp/blender-lite.apk \
+            "assets/blender_runtime.zip" \
+            -d /tmp/blender_apk
+
+          echo "Extracting startup.blend..."
+
+          mkdir -p /tmp/runtime
+          unzip -q \
+            /tmp/blender_apk/assets/blender_runtime.zip \
+            -d /tmp/runtime
+
+          if [ ! -f "/tmp/runtime/startup.blend" ]; then
+            echo "ERROR: startup.blend was not found inside blender_runtime.zip."
+            echo "Files found:"
+            find /tmp/runtime -type f | head -100
+            exit 1
+          fi
 
           mkdir -p release/datafiles
 
-          curl -fL \
-            "https://media.githubusercontent.com/media/blender/blender/main/release/datafiles/startup.blend" \
-            -o "${FILE}.real"
+          cp /tmp/runtime/startup.blend \
+            release/datafiles/startup.blend
 
-          ACTUAL_SIZE=$(stat -c%s "${FILE}.real")
-          ACTUAL_SHA=$(sha256sum "${FILE}.real" | awk '{print $1}')
-
-          echo "Downloaded size: ${ACTUAL_SIZE}"
-          echo "Downloaded SHA256: ${ACTUAL_SHA}"
-
-          if [ "$ACTUAL_SIZE" != "$EXPECTED_SIZE" ]; then
-            echo "ERROR: startup.blend has wrong size."
-            exit 1
-          fi
-
-          if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
-            echo "ERROR: startup.blend has wrong SHA256."
-            exit 1
-          fi
-
-          mv "${FILE}.real" "$FILE"
-
-          echo "Exact startup.blend restored successfully."
+          echo "startup.blend restored."
 
       - name: Verify startup.blend
+        shell: bash
         run: |
+          set -e
+
           SIZE=$(stat -c%s release/datafiles/startup.blend)
           SHA=$(sha256sum release/datafiles/startup.blend | awk '{print $1}')
 
           echo "startup.blend size: $SIZE"
           echo "startup.blend SHA256: $SHA"
 
-          test "$SIZE" = "121384"
-          test "$SHA" = "1335899143c7e77cb0f6e3680fd99078c0af481a1238e4ed7d4eb1ddd7dd353"
+          if [ "$SIZE" != "121384" ]; then
+            echo "ERROR: Wrong startup.blend size."
+            exit 1
+          fi
 
-          echo "startup.blend verification PASSED."
+          if [ "$SHA" != "1335899143c7e77cb0f6e3680fd99078c0af481a1238e4ed7d4eb1ddd7dd353" ]; then
+            echo "ERROR: Wrong startup.blend SHA256."
+            exit 1
+          fi
+
+          echo "startup.blend is correct."
 
       - name: Apply GPU storage buffer fix
         shell: bash
         run: |
           set -e
-
-          FILE="source/blender/gpu/intern/gpu_storage_buffer.cc"
 
           python3 <<'PY'
           from pathlib import Path
@@ -144,7 +154,7 @@ jobs:
               path.write_text(text.replace(old, new, 1))
               print("GPU storage buffer fix applied.")
           else:
-              print("ERROR: Expected function was not found.")
+              print("ERROR: GPU_storagebuf_update function was not found.")
               raise SystemExit(1)
           PY
 
@@ -155,10 +165,6 @@ jobs:
           echo "ANDROID_ABI=$ANDROID_ABI" >> "$GITHUB_ENV"
           echo "ANDROID_API=$ANDROID_API" >> "$GITHUB_ENV"
           echo "ANDROID_TOOLCHAIN_FILE=$ANDROID_TOOLCHAIN_FILE" >> "$GITHUB_ENV"
-
-          echo "ABI: $ANDROID_ABI"
-          echo "API: $ANDROID_API"
-          echo "NDK: $ANDROID_NDK_HOME"
 
       - name: Build Android dependencies
         run: |
@@ -176,8 +182,7 @@ jobs:
 
       - name: Find APK
         run: |
-          echo "Searching for generated APK..."
-
+          echo "Generated APK files:"
           find .. -type f -name "*.apk" -print
 
       - name: Upload APK
