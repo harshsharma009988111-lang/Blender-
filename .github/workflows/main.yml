@@ -15,6 +15,7 @@ jobs:
           ref: android-alpha-1
           fetch-depth: 1
           submodules: false
+          lfs: false
 
       - name: Install build tools
         run: |
@@ -42,9 +43,43 @@ jobs:
             libxcursor-dev \
             libwayland-dev
 
-      - name: Enable Git LFS
+      - name: Enable and download Git LFS files
         run: |
+          set -e
+
+          echo "Installing Git LFS..."
           git lfs install
+
+          echo "Downloading Blender Git LFS files..."
+          git lfs pull
+
+          echo "Checking Git LFS status..."
+          git lfs status
+
+      - name: Verify Blender LFS files
+        run: |
+          set -e
+
+          FILE="release/datafiles/startup.blend"
+
+          echo "Checking Blender startup file..."
+
+          if [ ! -f "$FILE" ]; then
+            echo "ERROR: $FILE does not exist."
+            exit 1
+          fi
+
+          FILE_SIZE=$(stat -c%s "$FILE")
+
+          echo "startup.blend size: $FILE_SIZE bytes"
+
+          if [ "$FILE_SIZE" -lt 1000000 ]; then
+            echo "ERROR: startup.blend appears to be incomplete."
+            echo "Git LFS probably did not download the real file."
+            exit 1
+          fi
+
+          echo "SUCCESS: startup.blend appears to be downloaded correctly."
 
       - name: Install Android SDK and NDK
         uses: android-actions/setup-android@v3
@@ -119,7 +154,7 @@ jobs:
               print("ERROR: Expected GPU_storagebuf_update function was not found.")
               print()
               print("The actual function found in the source is:")
-              
+
               marker = "void GPU_storagebuf_update"
               start = text.find(marker)
 
@@ -137,6 +172,8 @@ jobs:
 
       - name: Verify diagnostic patch
         run: |
+          set -e
+
           echo "Checking patched function..."
 
           python3 <<'PY'
@@ -187,8 +224,10 @@ jobs:
 
       - name: Build Android dependencies
         run: |
+          set -e
+
           echo "Building Blender Android dependencies."
-          echo "This may take a long time."
+          echo "This may take some time."
 
           mkdir -p ../blender_build_android/lib/android_arm64
 
@@ -198,12 +237,16 @@ jobs:
 
       - name: Build diagnostic Blender APK
         run: |
+          set -e
+
           chmod +x build_files/android/build_apk.sh
 
           build_files/android/build_apk.sh lite
 
       - name: Find generated APK
         run: |
+          set -e
+
           echo "Searching for APK files..."
 
           find .. -type f -name "*.apk" -print
