@@ -20,15 +20,20 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            git git-lfs \
-            cmake ninja-build \
-            python3 python3-pip \
+            git \
+            git-lfs \
+            cmake \
+            ninja-build \
+            python3 \
+            python3-pip \
             build-essential \
             pkg-config \
             meson \
             patchelf \
-            zip unzip \
-            curl wget \
+            zip \
+            unzip \
+            curl \
+            wget \
             openjdk-17-jdk \
             libx11-dev \
             libxi-dev \
@@ -73,12 +78,16 @@ jobs:
 
           FILE="source/blender/gpu/intern/gpu_storage_buffer.cc"
 
-          echo "Checking GPU storage buffer implementation..."
+          echo "Checking GPU storage buffer source..."
 
-          if ! grep -q "GPU_storagebuf_update" "$FILE"; then
-            echo "ERROR: GPU_storagebuf_update was not found."
+          if [ ! -f "$FILE" ]; then
+            echo "ERROR: File not found:"
+            echo "$FILE"
             exit 1
           fi
+
+          echo "Found:"
+          echo "$FILE"
 
           python3 <<'PY'
           from pathlib import Path
@@ -86,32 +95,83 @@ jobs:
           path = Path("source/blender/gpu/intern/gpu_storage_buffer.cc")
           text = path.read_text()
 
-          old = """void GPU_storagebuf_update(StorageBuf *bo, const void *data)
+          old = """void GPU_storagebuf_update(gpu::StorageBuf *ssbo, const void *data)
           {
-            unwrap(bo)->update(data);
+            ssbo->update(data);
           }"""
 
-          new = """void GPU_storagebuf_update(StorageBuf *bo, const void *data)
+          new = """void GPU_storagebuf_update(gpu::StorageBuf *ssbo, const void *data)
           {
-            if (bo == nullptr) {
+            if (ssbo == nullptr) {
               return;
             }
-            unwrap(bo)->update(data);
+
+            ssbo->update(data);
           }"""
 
-          if old not in text:
-              print("WARNING: Exact expected function body was not found.")
-              print("The source layout may differ from the diagnostic assumption.")
-              raise SystemExit(1)
+          if new in text:
+              print("Diagnostic null-pointer guard is already present.")
+          elif old in text:
+              text = text.replace(old, new, 1)
+              path.write_text(text)
+              print("Diagnostic null-pointer guard applied successfully.")
+          else:
+              print("ERROR: Expected GPU_storagebuf_update function was not found.")
+              print()
+              print("The actual function found in the source is:")
+              
+              marker = "void GPU_storagebuf_update"
+              start = text.find(marker)
 
-          path.write_text(text.replace(old, new, 1))
-          print("Diagnostic null-pointer guard applied successfully.")
+              if start != -1:
+                  end = text.find("\n}", start)
+                  if end != -1:
+                      print(text[start:end + 2])
+                  else:
+                      print(text[start:start + 500])
+              else:
+                  print("GPU_storagebuf_update was not found at all.")
+
+              raise SystemExit(1)
           PY
 
       - name: Verify diagnostic patch
         run: |
-          grep -A8 -B2 "void GPU_storagebuf_update" \
-            source/blender/gpu/intern/gpu_storage_buffer.cc
+          echo "Checking patched function..."
+
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path("source/blender/gpu/intern/gpu_storage_buffer.cc")
+          text = path.read_text()
+
+          marker = "void GPU_storagebuf_update"
+
+          start = text.find(marker)
+
+          if start == -1:
+              print("ERROR: GPU_storagebuf_update not found.")
+              raise SystemExit(1)
+
+          end = text.find("\n}", start)
+
+          if end == -1:
+              print("ERROR: Could not read function.")
+              raise SystemExit(1)
+
+          function = text[start:end + 2]
+
+          print("Actual function after patch:")
+          print("--------------------------------")
+          print(function)
+          print("--------------------------------")
+
+          if "if (ssbo == nullptr)" not in function:
+              print("ERROR: Null-pointer guard was NOT applied.")
+              raise SystemExit(1)
+
+          print("SUCCESS: Null-pointer guard verified.")
+          PY
 
       - name: Configure Android environment
         run: |
@@ -128,7 +188,7 @@ jobs:
       - name: Build Android dependencies
         run: |
           echo "Building Blender Android dependencies."
-          echo "This is expected to take a long time."
+          echo "This may take a long time."
 
           mkdir -p ../blender_build_android/lib/android_arm64
 
@@ -144,7 +204,8 @@ jobs:
 
       - name: Find generated APK
         run: |
-          echo "Searching for APK..."
+          echo "Searching for APK files..."
+
           find .. -type f -name "*.apk" -print
 
       - name: Upload diagnostic APK
