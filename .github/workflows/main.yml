@@ -79,16 +79,19 @@ jobs:
           echo "APK downloaded."
 
           rm -rf "$APK_DIR" "$RUNTIME"
-          mkdir -p "$APK_DIR" "$RUNTIME"
+
+          mkdir -p "$APK_DIR"
+          mkdir -p "$RUNTIME"
 
           echo "Extracting blender_runtime.zip..."
 
-          unzip -q "$APK" \
+          unzip -q \
+            "$APK" \
             "assets/blender_runtime.zip" \
             -d "$APK_DIR"
 
           if [ ! -f "$APK_DIR/assets/blender_runtime.zip" ]; then
-            echo "ERROR: blender_runtime.zip was not found in the APK."
+            echo "ERROR: blender_runtime.zip was not found."
             exit 1
           fi
 
@@ -107,7 +110,7 @@ jobs:
             exit 1
           fi
 
-          echo "Found startup.blend:"
+          echo "Found:"
           echo "$STARTUP"
 
           mkdir -p release/datafiles
@@ -121,19 +124,24 @@ jobs:
         run: |
           set -e
 
+          if [ ! -f "release/datafiles/startup.blend" ]; then
+            echo "ERROR: startup.blend does not exist."
+            exit 1
+          fi
+
           SIZE=$(stat -c%s release/datafiles/startup.blend)
-          SHA=$(sha256sum release/datafiles/startup.blend | awk '{print $1}')
+          SHA=$(sha256sum release/datafiles/startup.blend | cut -d' ' -f1)
 
           echo "startup.blend size: $SIZE"
           echo "startup.blend SHA256: $SHA"
 
-          if [ "$SIZE" != "121384" ]; then
-            echo "ERROR: Wrong startup.blend size."
+          if [ "$SIZE" -ne 121384 ]; then
+            echo "ERROR: startup.blend has the wrong size."
             exit 1
           fi
 
           if [ "$SHA" != "1335899143c7e77cb0f6e3680fd99078c0af481a1238e4ed7d4eb1ddd7dd353" ]; then
-            echo "ERROR: Wrong startup.blend SHA256."
+            echo "ERROR: startup.blend has the wrong SHA256."
             exit 1
           fi
 
@@ -171,7 +179,7 @@ jobs:
               print("GPU storage buffer fix applied.")
           else:
               print("ERROR: GPU_storagebuf_update function was not found.")
-              raise SystemExit(1)
+              exit(1)
           PY
 
       - name: Configure Android environment
