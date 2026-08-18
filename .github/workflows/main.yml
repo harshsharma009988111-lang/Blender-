@@ -1,0 +1,157 @@
+name: Build Blender Android Diagnostic APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout Android Alpha source
+        uses: actions/checkout@v4
+        with:
+          ref: android-alpha-1
+          fetch-depth: 1
+          submodules: false
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git git-lfs \
+            cmake ninja-build \
+            python3 python3-pip \
+            build-essential \
+            pkg-config \
+            meson \
+            patchelf \
+            zip unzip \
+            curl wget \
+            openjdk-17-jdk \
+            libx11-dev \
+            libxi-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev \
+            libwayland-dev
+
+      - name: Enable Git LFS
+        run: |
+          git lfs install
+
+      - name: Install Android SDK and NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform and NDK
+        run: |
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.1" \
+            "ndk;28.2.13676358"
+
+      - name: Set Android environment
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
+
+      - name: Prepare source
+        run: |
+          git status
+          git branch --show-current
+          git log -1 --oneline
+
+      - name: Apply diagnostic null-pointer fix
+        shell: bash
+        run: |
+          set -e
+
+          FILE="source/blender/gpu/intern/gpu_storage_buffer.cc"
+
+          echo "Checking GPU storage buffer implementation..."
+
+          if ! grep -q "GPU_storagebuf_update" "$FILE"; then
+            echo "ERROR: GPU_storagebuf_update was not found."
+            exit 1
+          fi
+
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path("source/blender/gpu/intern/gpu_storage_buffer.cc")
+          text = path.read_text()
+
+          old = """void GPU_storagebuf_update(StorageBuf *bo, const void *data)
+          {
+            unwrap(bo)->update(data);
+          }"""
+
+          new = """void GPU_storagebuf_update(StorageBuf *bo, const void *data)
+          {
+            if (bo == nullptr) {
+              return;
+            }
+            unwrap(bo)->update(data);
+          }"""
+
+          if old not in text:
+              print("WARNING: Exact expected function body was not found.")
+              print("The source layout may differ from the diagnostic assumption.")
+              raise SystemExit(1)
+
+          path.write_text(text.replace(old, new, 1))
+          print("Diagnostic null-pointer guard applied successfully.")
+          PY
+
+      - name: Verify diagnostic patch
+        run: |
+          grep -A8 -B2 "void GPU_storagebuf_update" \
+            source/blender/gpu/intern/gpu_storage_buffer.cc
+
+      - name: Configure Android environment
+        run: |
+          source build_files/android/env.sh
+
+          echo "ANDROID_ABI=$ANDROID_ABI" >> "$GITHUB_ENV"
+          echo "ANDROID_API=$ANDROID_API" >> "$GITHUB_ENV"
+          echo "ANDROID_TOOLCHAIN_FILE=$ANDROID_TOOLCHAIN_FILE" >> "$GITHUB_ENV"
+
+          echo "Android ABI: $ANDROID_ABI"
+          echo "Android API: $ANDROID_API"
+          echo "NDK: $ANDROID_NDK_HOME"
+
+      - name: Build Android dependencies
+        run: |
+          echo "Building Blender Android dependencies."
+          echo "This is expected to take a long time."
+
+          mkdir -p ../blender_build_android/lib/android_arm64
+
+          chmod +x build_files/android/deps/build.sh
+
+          build_files/android/deps/build.sh all
+
+      - name: Build diagnostic Blender APK
+        run: |
+          chmod +x build_files/android/build_apk.sh
+
+          build_files/android/build_apk.sh lite
+
+      - name: Find generated APK
+        run: |
+          echo "Searching for APK..."
+          find .. -type f -name "*.apk" -print
+
+      - name: Upload diagnostic APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: blender-5.3-android-diagnostic-lite
+          path: |
+            ../blender_build_android/**/*.apk
+          if-no-files-found: error
+          retention-days: 7
