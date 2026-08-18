@@ -9,6 +9,7 @@ jobs:
     timeout-minutes: 360
 
     steps:
+
       - name: Checkout Android Alpha source
         uses: actions/checkout@v4
         with:
@@ -21,39 +22,17 @@ jobs:
       - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            git \
-            git-lfs \
-            cmake \
-            ninja-build \
-            python3 \
-            python3-pip \
-            build-essential \
-            pkg-config \
-            meson \
-            patchelf \
-            zip \
-            unzip \
-            curl \
-            wget \
-            openjdk-17-jdk \
-            libx11-dev \
-            libxi-dev \
-            libxrandr-dev \
-            libxinerama-dev \
-            libxcursor-dev \
-            libwayland-dev
+          sudo apt-get install -y git git-lfs cmake ninja-build python3 build-essential pkg-config meson patchelf zip unzip curl wget openjdk-17-jdk
 
       - name: Install Android SDK and NDK
         uses: android-actions/setup-android@v3
 
       - name: Install Android platform and NDK
         run: |
-          sdkmanager --install \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.1" \
-            "ndk;28.2.13676358"
+          sdkmanager --install "platform-tools"
+          sdkmanager --install "platforms;android-35"
+          sdkmanager --install "build-tools;35.0.1"
+          sdkmanager --install "ndk;28.2.13676358"
 
       - name: Set Android environment
         run: |
@@ -61,76 +40,69 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
 
-      - name: Prepare source
+      - name: Show source information
         run: |
           git status
           git log -1 --oneline
 
-      - name: Apply diagnostic logging
+      - name: Apply null pointer diagnostic fix
         run: |
-          python3 -c 'from pathlib import Path; p=Path("source/blender/gpu/intern/gpu_storage_buffer.cc"); t=p.read_text(); t=t.replace("#include <cstring>", "#include <cstring>\n\n#ifdef __ANDROID__\n#  include <android/log.h>\n#  define LOG_DIAG(...) __android_log_print(ANDROID_LOG_ERROR, \"BLENDER_DIAGNOSTIC\", __VA_ARGS__)\n#else\n#  include <cstdio>\n#  define LOG_DIAG(...) std::printf(__VA_ARGS__)\n#endif", 1) if "#include <android/log.h>" not in t else t; old="""gpu::StorageBuf *GPU_storagebuf_create_ex(size_t size,
-                                          const void *data,
-                                          GPUUsageType usage,
-                                          const char *name)
-{
-  StorageBuf *ssbo = GPUBackend::get()->storagebuf_alloc(size, usage, name);
-"""; new="""gpu::StorageBuf *GPU_storagebuf_create_ex(size_t size,
-                                          const void *data,
-                                          GPUUsageType usage,
-                                          const char *name)
-{
-  LOG_DIAG("[BLENDER DIAGNOSTIC] GPU_storagebuf_create_ex(size=%zu, name='%s') called", size, name ? name : "unnamed");
+          python3 <<'PY'
+          from pathlib import Path
 
-  if (!GPU_storage_buffer_support()) {
-    LOG_DIAG("[BLENDER DIAGNOSTIC] Storage buffer support = FALSE");
-    return nullptr;
-  }
+          file = Path("source/blender/gpu/intern/gpu_storage_buffer.cc")
+          text = file.read_text()
 
-  LOG_DIAG("[BLENDER DIAGNOSTIC] Storage buffer support = TRUE");
+          old = """void GPU_storagebuf_update(gpu::StorageBuf *ssbo, const void *data)
+          {
+            ssbo->update(data);
+          }"""
 
-  StorageBuf *ssbo = GPUBackend::get()->storagebuf_alloc(size, usage, name);
+          new = """void GPU_storagebuf_update(gpu::StorageBuf *ssbo, const void *data)
+          {
+            if (ssbo == nullptr) {
+              return;
+            }
 
-  if (ssbo == nullptr) {
-    LOG_DIAG("[BLENDER DIAGNOSTIC] storagebuf_alloc() returned NULL");
-    return nullptr;
-  }
+            ssbo->update(data);
+          }"""
 
-  LOG_DIAG("[BLENDER DIAGNOSTIC] storagebuf_alloc() succeeded: %p", ssbo);
-"""; assert old in t, "GPU_storagebuf_create_ex() layout not found"; p.write_text(t.replace(old,new,1))'
+          if new in text:
+              print("Patch already exists.")
+          elif old in text:
+              file.write_text(text.replace(old, new, 1))
+              print("Null pointer fix applied successfully.")
+          else:
+              print("ERROR: Expected function was not found.")
+              raise SystemExit(1)
+          PY
 
-      - name: Verify diagnostic patch
+      - name: Verify null pointer fix
         run: |
-          grep -n "BLENDER_DIAGNOSTIC" \
-            source/blender/gpu/intern/gpu_storage_buffer.cc
+          grep -A8 "void GPU_storagebuf_update" source/blender/gpu/intern/gpu_storage_buffer.cc
 
       - name: Configure Android environment
         run: |
           source build_files/android/env.sh
-
           echo "ANDROID_ABI=$ANDROID_ABI" >> "$GITHUB_ENV"
           echo "ANDROID_API=$ANDROID_API" >> "$GITHUB_ENV"
           echo "ANDROID_TOOLCHAIN_FILE=$ANDROID_TOOLCHAIN_FILE" >> "$GITHUB_ENV"
-
-          echo "Android ABI: $ANDROID_ABI"
-          echo "Android API: $ANDROID_API"
-          echo "NDK: $ANDROID_NDK_HOME"
 
       - name: Build Android dependencies
         run: |
           chmod +x build_files/android/deps/build.sh
           build_files/android/deps/build.sh all
 
-      - name: Build diagnostic Blender APK
+      - name: Build Blender Android APK
         run: |
           chmod +x build_files/android/build_apk.sh
           build_files/android/build_apk.sh lite
 
-      - name: Find generated APK
+      - name: Find APK
         run: |
-          echo "Searching for APK files..."
           find .. -type f -name "*.apk" -print
 
-      - name: Upload diagnostic APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: blender-android-diagnostic
