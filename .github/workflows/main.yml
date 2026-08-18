@@ -22,7 +22,22 @@ jobs:
       - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y git git-lfs cmake ninja-build python3 build-essential pkg-config meson patchelf zip unzip curl wget openjdk-17-jdk
+          sudo apt-get install -y \
+            git \
+            git-lfs \
+            cmake \
+            ninja-build \
+            python3 \
+            python3-pip \
+            build-essential \
+            pkg-config \
+            meson \
+            patchelf \
+            zip \
+            unzip \
+            curl \
+            wget \
+            openjdk-17-jdk
 
       - name: Install Android SDK and NDK
         uses: android-actions/setup-android@v3
@@ -40,53 +55,118 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
 
-      - name: Show source information
+      - name: Restore startup.blend
         run: |
-          git status
-          git log -1 --oneline
+          mkdir -p release/datafiles
 
-      - name: Apply null pointer diagnostic fix
+          curl -L \
+            --fail \
+            "https://media.githubusercontent.com/media/blender/blender/main/release/datafiles/startup.blend" \
+            -o release/datafiles/startup.blend
+
+          ls -lh release/datafiles/startup.blend
+
+      - name: Check startup.blend
+        run: |
+          file release/datafiles/startup.blend
+
+          SIZE=$(stat -c%s release/datafiles/startup.blend)
+
+          echo "startup.blend size: $SIZE bytes"
+
+          if [ "$SIZE" -lt 100000 ]; then
+            echo "ERROR: startup.blend appears to be incomplete."
+            exit 1
+          fi
+
+          echo "startup.blend looks like a real file."
+
+      - name: Apply diagnostic logging
         run: |
           python3 <<'PY'
           from pathlib import Path
 
-          file = Path("source/blender/gpu/intern/gpu_storage_buffer.cc")
-          text = file.read_text()
+          path = Path("source/blender/gpu/intern/gpu_storage_buffer.cc")
+          text = path.read_text()
 
-          old = """void GPU_storagebuf_update(gpu::StorageBuf *ssbo, const void *data)
-          {
-            ssbo->update(data);
-          }"""
+          if "#include <android/log.h>" not in text:
+              text = text.replace(
+                  "#include <cstring>",
+                  """#include <cstring>
 
-          new = """void GPU_storagebuf_update(gpu::StorageBuf *ssbo, const void *data)
+          #ifdef __ANDROID__
+          #  include <android/log.h>
+          #  define LOG_DIAG(...) __android_log_print(ANDROID_LOG_ERROR, "BLENDER_DIAGNOSTIC", __VA_ARGS__)
+          #else
+          #  include <cstdio>
+          #  define LOG_DIAG(...) std::printf(__VA_ARGS__)
+          #endif""",
+                  1,
+              )
+
+          old = """gpu::StorageBuf *GPU_storagebuf_create_ex(size_t size,
+                                            const void *data,
+                                            GPUUsageType usage,
+                                            const char *name)
           {
-            if (ssbo == nullptr) {
-              return;
+            StorageBuf *ssbo = GPUBackend::get()->storagebuf_alloc(size, usage, name);
+          """
+
+          new = """gpu::StorageBuf *GPU_storagebuf_create_ex(size_t size,
+                                            const void *data,
+                                            GPUUsageType usage,
+                                            const char *name)
+          {
+            LOG_DIAG(
+                "[BLENDER DIAGNOSTIC] GPU_storagebuf_create_ex(size=%zu, name='%s') called",
+                size,
+                name ? name : "unnamed");
+
+            if (!GPU_storage_buffer_support()) {
+              LOG_DIAG(
+                  "[BLENDER DIAGNOSTIC] Storage buffer support = FALSE");
+              return nullptr;
             }
 
-            ssbo->update(data);
-          }"""
+            LOG_DIAG(
+                "[BLENDER DIAGNOSTIC] Storage buffer support = TRUE");
+
+            StorageBuf *ssbo =
+                GPUBackend::get()->storagebuf_alloc(size, usage, name);
+
+            if (ssbo == nullptr) {
+              LOG_DIAG(
+                  "[BLENDER DIAGNOSTIC] storagebuf_alloc() returned NULL");
+              return nullptr;
+            }
+
+            LOG_DIAG(
+                "[BLENDER DIAGNOSTIC] storagebuf_alloc() succeeded: %p",
+                ssbo);
+          """
 
           if new in text:
-              print("Patch already exists.")
+              print("Diagnostic patch already present.")
           elif old in text:
-              file.write_text(text.replace(old, new, 1))
-              print("Null pointer fix applied successfully.")
+              text = text.replace(old, new, 1)
+              path.write_text(text)
+              print("Diagnostic patch applied.")
           else:
-              print("ERROR: Expected function was not found.")
+              print("ERROR: GPU_storagebuf_create_ex() was not found.")
               raise SystemExit(1)
           PY
-
-      - name: Verify null pointer fix
-        run: |
-          grep -A8 "void GPU_storagebuf_update" source/blender/gpu/intern/gpu_storage_buffer.cc
 
       - name: Configure Android environment
         run: |
           source build_files/android/env.sh
+
           echo "ANDROID_ABI=$ANDROID_ABI" >> "$GITHUB_ENV"
           echo "ANDROID_API=$ANDROID_API" >> "$GITHUB_ENV"
           echo "ANDROID_TOOLCHAIN_FILE=$ANDROID_TOOLCHAIN_FILE" >> "$GITHUB_ENV"
+
+          echo "ABI: $ANDROID_ABI"
+          echo "API: $ANDROID_API"
+          echo "NDK: $ANDROID_NDK_HOME"
 
       - name: Build Android dependencies
         run: |
