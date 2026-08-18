@@ -66,37 +66,53 @@ jobs:
         run: |
           set -e
 
-          echo "Downloading official Android Alpha lite APK..."
+          APK="/tmp/blender-lite.apk"
+          APK_DIR="/tmp/blender_apk"
+          RUNTIME="/tmp/runtime"
+
+          echo "Downloading Android Alpha lite APK..."
 
           curl -fL \
             "https://github.com/simfeo/blender/releases/download/android-alpha-1/blender-lite.apk" \
-            -o /tmp/blender-lite.apk
+            -o "$APK"
+
+          echo "APK downloaded."
+
+          rm -rf "$APK_DIR" "$RUNTIME"
+          mkdir -p "$APK_DIR" "$RUNTIME"
 
           echo "Extracting blender_runtime.zip..."
 
-          mkdir -p /tmp/blender_apk
-          unzip -q /tmp/blender-lite.apk \
+          unzip -q "$APK" \
             "assets/blender_runtime.zip" \
-            -d /tmp/blender_apk
+            -d "$APK_DIR"
 
-          echo "Extracting startup.blend..."
-
-          mkdir -p /tmp/runtime
-          unzip -q \
-            /tmp/blender_apk/assets/blender_runtime.zip \
-            -d /tmp/runtime
-
-          if [ ! -f "/tmp/runtime/startup.blend" ]; then
-            echo "ERROR: startup.blend was not found inside blender_runtime.zip."
-            echo "Files found:"
-            find /tmp/runtime -type f | head -100
+          if [ ! -f "$APK_DIR/assets/blender_runtime.zip" ]; then
+            echo "ERROR: blender_runtime.zip was not found in the APK."
             exit 1
           fi
 
+          echo "Extracting runtime..."
+
+          unzip -q \
+            "$APK_DIR/assets/blender_runtime.zip" \
+            -d "$RUNTIME"
+
+          echo "Searching for startup.blend..."
+
+          STARTUP=$(find "$RUNTIME" -type f -name "startup.blend" -print -quit)
+
+          if [ -z "$STARTUP" ]; then
+            echo "ERROR: startup.blend was not found."
+            exit 1
+          fi
+
+          echo "Found startup.blend:"
+          echo "$STARTUP"
+
           mkdir -p release/datafiles
 
-          cp /tmp/runtime/startup.blend \
-            release/datafiles/startup.blend
+          cp "$STARTUP" release/datafiles/startup.blend
 
           echo "startup.blend restored."
 
@@ -121,7 +137,7 @@ jobs:
             exit 1
           fi
 
-          echo "startup.blend is correct."
+          echo "startup.blend verification PASSED."
 
       - name: Apply GPU storage buffer fix
         shell: bash
